@@ -323,6 +323,7 @@ def uimm7_opcode : RISCVUImmOp<7> {
 }
 def uimm7 : RISCVUImmLeafOp<7>;
 def uimm8 : RISCVUImmOp<8>;
+def uimm12 : RISCVUImmOp<12>;
 def uimm16 : RISCVUImmOp<16>;
 def uimm32 : RISCVUImmOp<32>;
 def uimm48 : RISCVUImmOp<48>;
@@ -612,6 +613,19 @@ include "RISCVInstrFormatsC.td"
 include "RISCVInstrFormatsV.td"
 
 //===----------------------------------------------------------------------===//
+// BMOV Instruction Class Templates
+//===----------------------------------------------------------------------===//
+
+// RVInstR<0b1111110, 0b000, OPC_OP_V, (outs BPR_C:$rd), (ins GPR:$rc1, GPR:$rs1, GPR:$rs2), "bmovc_beq", "$rd, $rc1">;
+// OPC_OP_V  shares same opcode as OP_BMOVC_R
+// OPC_OP_VE shares same opcode as OP_BMOVC_I
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+class BMOVC_rri<bits<3> funct3, string opcodestr>
+    : RVInstR<0b0000000, funct3, OPC_OP_V, (outs PBR:$rd),
+            (ins GPR:$rs1, GPR:$rs2), opcodestr, "$rd, $rs1, $rs2">;
+
+//===----------------------------------------------------------------------===//
 // Instruction Class Templates
 //===----------------------------------------------------------------------===//
 
@@ -752,6 +766,46 @@ def BLT  : BranchCC_rri<0b100, "blt">;
 def BGE  : BranchCC_rri<0b101, "bge">;
 def BLTU : BranchCC_rri<0b110, "bltu">;
 def BGEU : BranchCC_rri<0b111, "bgeu">;
+
+//===----------------------------------------------------------------------===//
+// Non-Spec Instructions
+//===----------------------------------------------------------------------===//
+
+let hasSideEffects = 0 , mayLoad = 0, mayStore = 0 in {
+def BMOVT_J : RVInstJ<OPC_CUSTOM_1, (outs PBR:$rd), (ins simm21_lsb0_jal:$imm20),
+								"bmovt", "$rd, $imm20">, Sched<[WriteJal]>;
+def BMOVT_I : RVInstI<0b001, OPC_CUSTOM_2, (outs PBR:$rd), (ins GPR:$rs1, simm12:$imm12),
+								"bmovt", "$rd, $rs1, $imm12">;
+
+def BMOVS_J : RVInstJ<OPC_CUSTOM_0, (outs PBR:$rd), (ins simm21_lsb0_jal:$imm20),
+								"bmovs", "$rd, $imm20">, Sched<[WriteJal]>;
+def BMOVS_I : RVInstI<0b000, OPC_CUSTOM_2, (outs PBR:$rd), (ins GPR:$rs1, simm12:$imm12),
+								"bmovs", "$rd, $rs1, $imm12">;
+
+def BMOVC_BEQ : BMOVC_rri<0b000, "bmovc_beq">;
+def BMOVC_BNE : BMOVC_rri<0b001, "bmovc_bne">;
+def BMOVC_BLT : BMOVC_rri<0b100, "bmovc_blt">;
+def BMOVC_BGE : BMOVC_rri<0b101, "bmovc_bge">;
+def BMOVC_BLTU : BMOVC_rri<0b110, "bmovc_bltu">;
+def BMOVC_BGEU : BMOVC_rri<0b111, "bmovc_bgeu">;
+
+def BMOVC_LOOP : RVInstI<0b100, OPC_OP_VE, (outs PBR:$rd), (ins GPR:$rs1, uimm12:$imm12),
+                                "bmovc_loop", "$rd, ${imm12}(${rs1})">;
+
+def BMOVC_BITS : RVInstI<0b010, OPC_OP_VE, (outs PBR:$rd), (ins GPR:$rs1, uimm12:$imm12),
+                                "bmovc_bits", "$rd, $rs1, $imm12">;
+}
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isBranch=1, isTerminator=1 in {
+def PBAL : RVInstR<0b0000000, 0b000, OPC_CUSTOM_3, (outs GPR:$rd), (ins PBR:$rs1, GPR:$rs2),
+								"pbal", "$rd, $rs1, $rs2">;
+}
+
+def : InstAlias<"pb $rs1",   (PBAL X0, PBR:$rs1, X0)>;
+def : InstAlias<"bmovs $rd, $rs1", (BMOVS_I PBR:$rd, GPR:$rs1, 0)>;
+def : InstAlias<"bmovt $rd, $rs1", (BMOVT_I PBR:$rd, GPR:$rs1, 0)>;
+def : InstAlias<"bmovc_loop $rd, $imm12", (BMOVC_LOOP PBR:$rd, X0, uimm12:$imm12)>;
+def : InstAlias<"bmovc_loop $rd, $rs", (BMOVC_LOOP PBR:$rd, GPR:$rs, 0)>;
 
 let IsSignExtendingOpW = 1 in {
 def LB  : Load_ri<0b000, "lb">, Sched<[WriteLDB, ReadMemBase]>;
