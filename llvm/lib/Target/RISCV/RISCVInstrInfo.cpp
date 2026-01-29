@@ -1253,6 +1253,7 @@ unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
 
 // Inserts a branch into the end of the specific MachineBasicBlock, returning
 // the number of instructions inserted.
+// NOTE(non-spec): Cond is the operands of a conditional branch, [Opcode, rs1, rs2]
 unsigned RISCVInstrInfo::insertBranch(
     MachineBasicBlock &MBB, MachineBasicBlock *TBB, MachineBasicBlock *FBB,
     ArrayRef<MachineOperand> Cond, const DebugLoc &DL, int *BytesAdded) const {
@@ -1266,7 +1267,8 @@ unsigned RISCVInstrInfo::insertBranch(
 
   // Unconditional branch.
   if (Cond.empty()) {
-    MachineInstr &MI = *BuildMI(&MBB, DL, get(RISCV::PseudoBR)).addMBB(TBB);
+    // TODO(non-spec): Need to insert BMOV's
+    MachineInstr &MI = *BuildMI(&MBB, DL, get(RISCV::PseudoPBU)).addReg(RISCV::B0).addMBB(TBB);
     if (BytesAdded)
       *BytesAdded += getInstSizeInBytes(MI);
     return 1;
@@ -1285,7 +1287,8 @@ unsigned RISCVInstrInfo::insertBranch(
     return 1;
 
   // Two-way conditional branch.
-  MachineInstr &MI = *BuildMI(&MBB, DL, get(RISCV::PseudoBR)).addMBB(FBB);
+  // TODO(non-spec): Need to insert BMOV's
+  MachineInstr &MI = *BuildMI(&MBB, DL, get(RISCV::PseudoPBU)).addReg(RISCV::B0).addMBB(FBB);
   if (BytesAdded)
     *BytesAdded += getInstSizeInBytes(MI);
   return 2;
@@ -1637,6 +1640,9 @@ bool RISCVInstrInfo::isBranchOffsetInRange(unsigned BranchOp,
     return isInt<21>(BrOffset);
   case RISCV::PseudoJump:
     return isInt<32>(SignExtend64(BrOffset + 0x800, XLen));
+  case RISCV::PseudoPBU:
+  case RISCV::PBAL:
+    return true;
   }
 }
 

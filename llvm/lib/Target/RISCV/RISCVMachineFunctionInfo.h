@@ -218,6 +218,23 @@ public:
 
   bool hasDynamicAllocation() const { return HasDynamicAllocation; }
   void setDynamicAllocation() { HasDynamicAllocation = true; }
+
+  //===----------------------------------------------------------------------===//
+  // Non-Spec Extensions
+  //===----------------------------------------------------------------------===//
+private:
+  /// Non-Spec branch sources
+  DenseMap<const MachineInstr*, MCSymbol*> JumpSourceSyms;
+
+public:
+  void setJumpSymbol(const MachineInstr *MI, MCSymbol *Sym) {
+    JumpSourceSyms[MI] = Sym;
+  }
+
+  MCSymbol *getJumpSymbol(const MachineInstr *MI) const {
+    const auto It = JumpSourceSyms.find(MI);
+    return (It == JumpSourceSyms.end()) ? nullptr : It->second;
+  }
 };
 
 } // end namespace llvm

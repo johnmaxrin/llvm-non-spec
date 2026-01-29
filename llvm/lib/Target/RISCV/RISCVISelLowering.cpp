@@ -40,6 +40,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicsRISCV.h"
 #include "llvm/MC/MCCodeEmitter.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCInstBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -8404,6 +8405,8 @@ SDValue RISCVTargetLowering::emitFlushICache(SelectionDAG &DAG, SDValue InChain,
 
 SDValue RISCVTargetLowering::lowerINIT_TRAMPOLINE(SDValue Op,
                                                   SelectionDAG &DAG) const {
+  llvm::report_fatal_error("[Non-Spec] Trampolines disabled");
+
   if (!Subtarget.is64Bit())
     llvm::report_fatal_error("Trampolines only implemented for RV64");
 
@@ -21257,6 +21260,36 @@ RISCVTargetLowering::getTargetConstantFromLoad(LoadSDNode *Ld) const {
   return CNodeLo->getConstVal();
 }
 
+static MachineBasicBlock *emitPseudoBMOV(MachineInstr &MI, MachineBasicBlock *MBB) {
+  MachineFunction *MF = MBB->getParent();
+  TargetInstrInfo const*TII = MF->getSubtarget().getInstrInfo();
+  DebugLoc DL = MI.getDebugLoc();
+  MachineBasicBlock *TargetBB = MI.getOperand(0).getMBB();
+
+  MCSymbol* Sym = MF->getContext().createTempSymbol("ns-j");
+
+  // bmovs b0, (location of pb)
+  BuildMI(*MBB, MI, DL, TII->get(RISCV::BMOVS_J))
+      .addReg(RISCV::B0) // RISC-V uses x0 as the link register for jumps
+      .addSym(Sym);
+
+  // bmovt b0, (target)
+  BuildMI(*MBB, MI, DL, TII->get(RISCV::BMOVT_J))
+      .addReg(RISCV::B0) // RISC-V uses x0 as the link register for jumps
+      .addMBB(TargetBB);
+
+  // pb b0
+  const MachineInstr *PBMI = BuildMI(*MBB, MI, DL, TII->get(RISCV::PseudoPBU))
+      .addReg(RISCV::B0)
+      .addMBB(TargetBB);
+  // NOTE(non-spec): ^^ we include the target location here so
+  //                 that compiler passes will see this as a normal jump
+
+  MF->getInfo<RISCVMachineFunctionInfo>()->setJumpSymbol(PBMI, Sym);
+  MI.eraseFromParent();
+  return MBB;
+}
+
 static MachineBasicBlock *emitReadCounterWidePseudo(MachineInstr &MI,
                                                     MachineBasicBlock *BB) {
   assert(MI.getOpcode() == RISCV::ReadCounterWide && "Unexpected instruction");
@@ -21897,6 +21930,8 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     llvm_unreachable("Unexpected instr type to insert");
+  case RISCV::PseudoBR:
+    return emitPseudoBMOV(MI, BB);
   case RISCV::ReadCounterWide:
     assert(!Subtarget.is64Bit() &&
            "ReadCounterWide is only to be used on riscv32");

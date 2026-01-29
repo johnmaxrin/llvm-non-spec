@@ -311,6 +311,13 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
   // Do any auto-generated pseudo lowerings.
   if (MCInst OutInst; lowerPseudoInstExpansion(MI, OutInst)) {
+    // NOTE(non-spec): Insert label to identify the location of PBAL instructions
+    if (OutInst.getOpcode() == RISCV::PBAL) {
+      auto *MFI = MI->getMF()->getInfo<RISCVMachineFunctionInfo>();
+      MCSymbol *Sym = MFI->getJumpSymbol(MI);
+      assert(Sym && "No symbol was found for this PBAL machine instruction!");
+      OutStreamer->emitLabel(Sym);
+    }
     EmitToStreamer(*OutStreamer, OutInst);
     return;
   }

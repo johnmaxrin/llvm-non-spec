@@ -796,7 +796,7 @@ def BMOVC_BITS : RVInstI<0b010, OPC_OP_VE, (outs PBR:$rd), (ins GPR:$rs1, uimm12
                                 "bmovc_bits", "$rd, $rs1, $imm12">;
 }
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isBranch=1, isTerminator=1 in {
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isBarrier = 1, isBranch = 1, isTerminator = 1 in {
 def PBAL : RVInstR<0b0000000, 0b000, OPC_CUSTOM_3, (outs GPR:$rd), (ins PBR:$rs1, GPR:$rs2),
 								"pbal", "$rd, $rs1, $rs2">;
 }
@@ -1733,6 +1733,14 @@ multiclass SelectCC_GPR_riirr<DAGOperand valty, DAGOperand imm> {
 
 /// Branches and jumps
 
+/*
+    TODO: Replace BEQ/BNE/.. with pseudo instructions that expand to their regular versions,
+          so then I can make a custom inserter.
+*/
+//let isBarrier = 1, isBranch = 1, isTerminator = 1, usesCustomInserter = 0 in
+//def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>;
+//               PseudoInstExpansion<(JAL X0, simm21_lsb0_jal:$imm20)>;
+
 // Match `riscv_brcc` and lower to the appropriate RISC-V branch instruction.
 multiclass BccPat<CondCode Cond, RVInstB Inst> {
   def : Pat<(riscv_brcc (XLenVT GPR:$rs1), GPR:$rs2, Cond, bb:$imm12),
@@ -1742,17 +1750,17 @@ multiclass BccPat<CondCode Cond, RVInstB Inst> {
             (Inst GPR:$rs1, (XLenVT X0), bare_simm13_lsb0_bb:$imm12)>;
 }
 
-class BrccCompressOpt<CondCode Cond, RVInstB Inst>
-    : Pat<(riscv_brcc GPR:$lhs, simm12_no6:$Constant, Cond, bb:$place),
-          (Inst (XLenVT (ADDI GPR:$lhs, (NegImm simm12:$Constant))),
-                (XLenVT X0), bb:$place)>;
-
 defm : BccPat<SETEQ, BEQ>;
 defm : BccPat<SETNE, BNE>;
 defm : BccPat<SETLT, BLT>;
 defm : BccPat<SETGE, BGE>;
 defm : BccPat<SETULT, BLTU>;
 defm : BccPat<SETUGE, BGEU>;
+
+class BrccCompressOpt<CondCode Cond, RVInstB Inst>
+    : Pat<(riscv_brcc GPR:$lhs, simm12_no6:$Constant, Cond, bb:$place),
+          (Inst (XLenVT (ADDI GPR:$lhs, (NegImm simm12:$Constant))),
+                (XLenVT X0), bb:$place)>;
 
 let Predicates = [HasStdExtZca, OptForMinSize] in {
   def : BrccCompressOpt<SETEQ, BEQ>;
@@ -1779,9 +1787,20 @@ def PseudoLongBGE : LongBccPseudo;
 def PseudoLongBLTU : LongBccPseudo;
 def PseudoLongBGEU : LongBccPseudo;
 
-let isBarrier = 1, isBranch = 1, isTerminator = 1 in
-def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>,
-               PseudoInstExpansion<(JAL X0, simm21_lsb0_jal:$imm20)>;
+/*
+    PB   Unconditional -> PBU
+    PB   Conditional   -> PBC
+    PBAL Unconditional -> PBALU
+*/
+
+let isBarrier = 1, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
+def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, simm21_lsb0_jal:$imm20), []>,
+                PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
+
+let isBarrier = 1, isBranch = 1, isTerminator = 1, usesCustomInserter = 1 in
+def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>;
+              // PseudoInstExpansion<(JAL X0, simm21_lsb0_jal:$imm20)>;
+              // PseudoInstExpansion<(PBAL X0, B0, X0)>;
 
 let Predicates = [NoStdExtZicfilp],
     isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1 in

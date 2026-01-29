@@ -292,6 +292,7 @@ void RISCVMCCodeEmitter::expandLongCondBr(const MCInst &MI,
                                           SmallVectorImpl<char> &CB,
                                           SmallVectorImpl<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
+  // TODO(non-spec): replace jumps with PBAL
   MCRegister SrcReg1 = MI.getOperand(0).getReg();
   MCRegister SrcReg2 = MI.getOperand(1).getReg();
   MCOperand SrcSymbol = MI.getOperand(2);
