@@ -622,8 +622,8 @@ include "RISCVInstrFormatsV.td"
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
 class BMOVC_rri<bits<3> funct3, string opcodestr>
-    : RVInstR<0b0000000, funct3, OPC_OP_V, (outs PBR:$rd),
-            (ins GPR:$rs1, GPR:$rs2), opcodestr, "$rd, $rs1, $rs2">;
+    : RVInstR<0b0000000, funct3, OPC_OP_V, (outs),
+            (ins PBR:$rd, GPR:$rs1, GPR:$rs2), opcodestr, "$rd, $rs1, $rs2">;
 
 //===----------------------------------------------------------------------===//
 // Instruction Class Templates
@@ -771,10 +771,10 @@ def BGEU : BranchCC_rri<0b111, "bgeu">;
 // Non-Spec Instructions
 //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 0 , mayLoad = 0, mayStore = 0 in {
-def BMOVT_J : RVInstJ<OPC_CUSTOM_1, (outs PBR:$rd), (ins simm21_lsb0_jal:$imm20),
+let hasSideEffects = 1 , mayLoad = 0, mayStore = 0 in {
+def BMOVT_J : RVInstJ<OPC_CUSTOM_1, (outs), (ins PBR:$rd, simm21_lsb0_jal:$imm20),
 								"bmovt", "$rd, $imm20">, Sched<[WriteJal]>;
-def BMOVT_I : RVInstI<0b001, OPC_CUSTOM_2, (outs PBR:$rd), (ins GPR:$rs1, simm12:$imm12),
+def BMOVT_I : RVInstI<0b001, OPC_CUSTOM_2, (outs), (ins PBR:$rd, GPR:$rs1, simm12:$imm12),
 								"bmovt", "$rd, $rs1, $imm12">;
 
 def BMOVS_J : RVInstJ<OPC_CUSTOM_0, (outs PBR:$rd), (ins simm21_lsb0_jal:$imm20),
@@ -789,15 +789,15 @@ def BMOVC_BGE : BMOVC_rri<0b101, "bmovc_bge">;
 def BMOVC_BLTU : BMOVC_rri<0b110, "bmovc_bltu">;
 def BMOVC_BGEU : BMOVC_rri<0b111, "bmovc_bgeu">;
 
-def BMOVC_LOOP : RVInstI<0b100, OPC_OP_VE, (outs PBR:$rd), (ins GPR:$rs1, uimm12:$imm12),
+def BMOVC_LOOP : RVInstI<0b100, OPC_OP_VE, (outs), (ins PBR:$rd, GPR:$rs1, uimm12:$imm12),
                                 "bmovc_loop", "$rd, ${imm12}(${rs1})">;
 
-def BMOVC_BITS : RVInstI<0b010, OPC_OP_VE, (outs PBR:$rd), (ins GPR:$rs1, uimm12:$imm12),
+def BMOVC_BITS : RVInstI<0b010, OPC_OP_VE, (outs), (ins PBR:$rd, GPR:$rs1, uimm12:$imm12),
                                 "bmovc_bits", "$rd, $rs1, $imm12">;
 }
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isBarrier = 1, isBranch = 1, isTerminator = 1 in {
-def PBAL : RVInstR<0b0000000, 0b000, OPC_CUSTOM_3, (outs GPR:$rd), (ins PBR:$rs1, GPR:$rs2),
+def PBAL : RVInstR<0b0000000, 0b000, OPC_CUSTOM_3, (outs), (ins GPR:$rd, PBR:$rs1, GPR:$rs2),
 								"pbal", "$rd, $rs1, $rs2">;
 }
 
@@ -1733,29 +1733,30 @@ multiclass SelectCC_GPR_riirr<DAGOperand valty, DAGOperand imm> {
 
 /// Branches and jumps
 
-/*
-    TODO: Replace BEQ/BNE/.. with pseudo instructions that expand to their regular versions,
-          so then I can make a custom inserter.
-*/
-//let isBarrier = 1, isBranch = 1, isTerminator = 1, usesCustomInserter = 0 in
-//def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>;
-//               PseudoInstExpansion<(JAL X0, simm21_lsb0_jal:$imm20)>;
-
-// Match `riscv_brcc` and lower to the appropriate RISC-V branch instruction.
-multiclass BccPat<CondCode Cond, RVInstB Inst> {
-  def : Pat<(riscv_brcc (XLenVT GPR:$rs1), GPR:$rs2, Cond, bb:$imm12),
-            (Inst GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$imm12)>;
-  // Explicitly select 0 to X0. The register coalescer doesn't always do it.
-  def : Pat<(riscv_brcc (XLenVT GPR:$rs1), 0, Cond, bb:$imm12),
-            (Inst GPR:$rs1, (XLenVT X0), bare_simm13_lsb0_bb:$imm12)>;
+let isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in {
+def PseudoBREQ : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
+def PseudoBRNE : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
+def PseudoBRLT : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
+def PseudoBRGE : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
+def PseudoBRLTU : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
+def PseudoBRGEU : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
 }
 
-defm : BccPat<SETEQ, BEQ>;
-defm : BccPat<SETNE, BNE>;
-defm : BccPat<SETLT, BLT>;
-defm : BccPat<SETGE, BGE>;
-defm : BccPat<SETULT, BLTU>;
-defm : BccPat<SETUGE, BGEU>;
+// Match `riscv_brcc` and lower to the appropriate RISC-V branch instruction.
+multiclass BccPat<CondCode Cond, Pseudo ins> {
+  def : Pat<(riscv_brcc (XLenVT GPR:$rs1), GPR:$rs2, Cond, bb:$imm12),
+            (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$imm12)>;
+  // Explicitly select 0 to X0. The register coalescer doesn't always do it.
+  def : Pat<(riscv_brcc (XLenVT GPR:$rs1), 0, Cond, bb:$imm12),
+            (ins GPR:$rs1, (XLenVT X0), bare_simm13_lsb0_bb:$imm12)>;
+}
+
+defm : BccPat<SETEQ, PseudoBREQ>;
+defm : BccPat<SETNE, PseudoBRNE>;
+defm : BccPat<SETLT, PseudoBRLT>;
+defm : BccPat<SETGE, PseudoBRGE>;
+defm : BccPat<SETULT, PseudoBRLTU>;
+defm : BccPat<SETUGE, PseudoBRGEU>;
 
 class BrccCompressOpt<CondCode Cond, RVInstB Inst>
     : Pat<(riscv_brcc GPR:$lhs, simm12_no6:$Constant, Cond, bb:$place),
@@ -1793,8 +1794,12 @@ def PseudoLongBGEU : LongBccPseudo;
     PBAL Unconditional -> PBALU
 */
 
+let isBarrier = 0, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
+def PseudoPBC : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, simm21_lsb0_jal:$imm20), []>,
+                PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
+
 let isBarrier = 1, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
-def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, simm21_lsb0_jal:$imm20), []>,
+def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, simm21_lsb0_jal:$imm20), []>,
                 PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
 
 let isBarrier = 1, isBranch = 1, isTerminator = 1, usesCustomInserter = 1 in

@@ -19,6 +19,7 @@
 #include "RISCVRegisterInfo.h"
 #include "RISCVSelectionDAGInfo.h"
 #include "RISCVSubtarget.h"
+#include "RISCVNonSpec.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -21260,33 +21261,16 @@ RISCVTargetLowering::getTargetConstantFromLoad(LoadSDNode *Ld) const {
   return CNodeLo->getConstVal();
 }
 
+static MachineBasicBlock *emitPseudoCCBMOV(MachineInstr &MI, MachineBasicBlock *MBB) {
+  Register rs1 = MI.getOperand(0).getReg();
+  Register rs2 = MI.getOperand(1).getReg();
+  MachineBasicBlock *TargetBB = MI.getOperand(2).getMBB();
+  RISCVNonSpec::insertConditionalBranch(*MBB, &MI, rs1, rs2, TargetBB);
+  return MBB;
+}
+
 static MachineBasicBlock *emitPseudoBMOV(MachineInstr &MI, MachineBasicBlock *MBB) {
-  MachineFunction *MF = MBB->getParent();
-  TargetInstrInfo const*TII = MF->getSubtarget().getInstrInfo();
-  DebugLoc DL = MI.getDebugLoc();
-  MachineBasicBlock *TargetBB = MI.getOperand(0).getMBB();
-
-  MCSymbol* Sym = MF->getContext().createTempSymbol("ns-j");
-
-  // bmovs b0, (location of pb)
-  BuildMI(*MBB, MI, DL, TII->get(RISCV::BMOVS_J))
-      .addReg(RISCV::B0) // RISC-V uses x0 as the link register for jumps
-      .addSym(Sym);
-
-  // bmovt b0, (target)
-  BuildMI(*MBB, MI, DL, TII->get(RISCV::BMOVT_J))
-      .addReg(RISCV::B0) // RISC-V uses x0 as the link register for jumps
-      .addMBB(TargetBB);
-
-  // pb b0
-  const MachineInstr *PBMI = BuildMI(*MBB, MI, DL, TII->get(RISCV::PseudoPBU))
-      .addReg(RISCV::B0)
-      .addMBB(TargetBB);
-  // NOTE(non-spec): ^^ we include the target location here so
-  //                 that compiler passes will see this as a normal jump
-
-  MF->getInfo<RISCVMachineFunctionInfo>()->setJumpSymbol(PBMI, Sym);
-  MI.eraseFromParent();
+  RISCVNonSpec::insertUnconditionalBranch(*MBB, &MI, MI.getOperand(0).getMBB(), "ns_j_");
   return MBB;
 }
 
@@ -21679,17 +21663,24 @@ static MachineBasicBlock *emitSelectPseudo(MachineInstr &MI,
   HeadMBB->addSuccessor(IfFalseMBB);
   HeadMBB->addSuccessor(TailMBB);
 
+  unsigned Br = RISCVCC::getBrCond(CC, MI.getOpcode());
+
   // Insert appropriate branch.
-  if (MI.getOperand(2).isImm())
-    BuildMI(HeadMBB, DL, TII.get(RISCVCC::getBrCond(CC, MI.getOpcode())))
+  if (MI.getOperand(2).isImm()) {
+    llvm_unreachable("Branch With Immediate Not Implemented");
+    BuildMI(HeadMBB, DL, TII.get(Br))
         .addReg(LHS)
         .addImm(MI.getOperand(2).getImm())
         .addMBB(TailMBB);
-  else
-    BuildMI(HeadMBB, DL, TII.get(RISCVCC::getBrCond(CC, MI.getOpcode())))
-        .addReg(LHS)
-        .addReg(RHS)
-        .addMBB(TailMBB);
+  }
+  else {
+    RISCVNonSpec::insertConditionalBranch(*HeadMBB, DL, CC, LHS, RHS, TailMBB, nullptr);
+
+    //BuildMI(HeadMBB, DL, TII.get(Br))
+    //    .addReg(LHS)
+    //    .addReg(RHS)
+    //    .addMBB(TailMBB);
+  }
 
   // IfFalseMBB just falls through to TailMBB.
   IfFalseMBB->addSuccessor(TailMBB);
@@ -21930,6 +21921,13 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     llvm_unreachable("Unexpected instr type to insert");
+  case RISCV::PseudoBREQ:
+  case RISCV::PseudoBRNE:
+  case RISCV::PseudoBRLT:
+  case RISCV::PseudoBRGE:
+  case RISCV::PseudoBRLTU:
+  case RISCV::PseudoBRGEU:
+    return emitPseudoCCBMOV(MI, BB);
   case RISCV::PseudoBR:
     return emitPseudoBMOV(MI, BB);
   case RISCV::ReadCounterWide:

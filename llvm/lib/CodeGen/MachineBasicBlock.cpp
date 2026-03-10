@@ -1494,7 +1494,9 @@ void MachineBasicBlock::ReplaceUsesOfBlockWith(MachineBasicBlock *Old,
   MachineBasicBlock::instr_iterator I = instr_end();
   while (I != instr_begin()) {
     --I;
-    if (!I->isTerminator()) break;
+    // NOTE: [Non-Spec] I don't know the consequences of this change!
+    //       This has the potential to break many things!
+    if (!I->isTerminator()) continue;
 
     // Scan the operands of this machine instruction, replacing any uses of Old
     // with New.
