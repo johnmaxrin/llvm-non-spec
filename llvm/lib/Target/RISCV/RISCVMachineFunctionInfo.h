@@ -222,70 +222,24 @@ public:
   //===----------------------------------------------------------------------===//
   // Non-Spec Extensions
   //===----------------------------------------------------------------------===//
-private:
+
   struct BMOVSupport {
     MachineInstr* source;
     MachineInstr* target;
-    MachineInstr* condition;
+    MachineInstr* condition; // can be nullptr
   };
 
-  DenseMap<const MachineInstr*, const MachineInstr*> BMOVTToPBMap;
-  DenseMap<const MachineInstr*, BMOVSupport> BMOVSupports;
-
-public:
-
-#define DEBUG_TYPE "ir"
-  void setBranch(const MachineInstr* pb, MachineInstr* source, MachineInstr* target, MachineInstr* condition = nullptr) {
-    assert(source->getOperand(1).isMCSymbol());
-    // assert(target->getOperand(1).isMBB());
-    assert((condition == nullptr) || (condition->getOperand(0).isReg() && condition->getOperand(1).isReg()));
-    BMOVSupports[pb] = BMOVSupport { source, target, condition };
-    BMOVTToPBMap[target] = pb;
-  }
-  /*MachineBasicBlock* getBranchSource(const MachineInstr* pb) const {
-    const auto It = BMOVSupports.find(pb);
-    return (It == BMOVSupports.end()) ? nullptr : It->second.source->getOperand(1).getMBB();
-  }*/
-  MachineBasicBlock* getBranchTarget(const MachineInstr* pb) const {
-    return pb->getOperand(2).getMBB();
-  }
-  MachineBasicBlock* getBMOVTarget(const MachineInstr *bmovt) const {
-    const auto It = BMOVTToPBMap.find(bmovt);
-    assert(It != BMOVTToPBMap.end());
-    return getBranchTarget(It->second);
-  }
-  unsigned getBranchOpcode(const MachineInstr *pb) const {
-    const auto It = BMOVSupports.find(pb);
-    assert(It != BMOVSupports.end());
-    return It->second.condition->getOpcode();
-  }
-  RISCVCC::CondCode getBranchCond(const MachineInstr* pb) const {
-    return RISCVInstrInfo::getCondFromBranchOpc(getBranchOpcode(pb));
-  }
-  MachineOperand* getBranchReg(const MachineInstr* pb, int i) const {
-    const auto It = BMOVSupports.find(pb);
-    assert(It != BMOVSupports.end());
-    MachineInstr* condition = It->second.condition;
-    assert(condition != nullptr);
-    assert(condition->getOperand(i+1).isReg());
-    return &condition->getOperand(i+1);
-  }
-  void removeBranchComplete(MachineInstr* pb) {
-    const auto SupportIt = BMOVSupports.find(pb);
-    assert(SupportIt != BMOVSupports.end());
-    const auto TargetIt = BMOVTToPBMap.find(SupportIt->second.target);
-    assert(TargetIt != BMOVTToPBMap.end());
-    const BMOVSupport &Support = SupportIt->second;
-
-    Support.source->eraseFromParent();
-    Support.target->eraseFromParent();
-    if (Support.condition)
-      Support.condition->eraseFromParent();
-    BMOVSupports.erase(SupportIt);
-    BMOVTToPBMap.erase(TargetIt);
-    pb->eraseFromParent();
-  }
-#undef DEBUG_TYPE
+  void setBranch(MachineInstr* PB, MachineInstr* Source, MachineInstr* Target, MachineInstr* Condition = nullptr);
+  static MachineBasicBlock* getBranchTarget(const MachineInstr* PB);
+  void fixBranchSource(MachineInstr *BMOVS) const;
+  void fixBranchTarget(MachineInstr *BMOVT) const;
+  unsigned getBranchOpcode(const MachineInstr *PB) const;
+  MCSymbol* getBranchSource(MachineInstr* PB) const;
+  MCSymbol* getBranchSource(MachineInstr *PB, MachineInstr *BMOVS) const;
+  RISCVCC::CondCode getBranchCond(const MachineInstr* PB) const;
+  const MachineOperand& getBranchReg(const MachineInstr* PB, int Index) const;
+  unsigned removeBranchComplete(MachineInstr* PB, int *BytesRemoved = nullptr);
+  BMOVSupport getBMOVSupport(MachineInstr *PB) const;
 };
 
 } // end namespace llvm

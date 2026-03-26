@@ -100,6 +100,91 @@ static bool IsNonSpec(unsigned opcode) {
   }
 }
 
+static bool IsNonPseudoNonSpec(unsigned opcode) {
+  switch (opcode) {
+  case RISCV::BMOVS_I:
+  case RISCV::BMOVS_J:
+  case RISCV::BMOVT_I:
+  case RISCV::BMOVT_J:
+  case RISCV::PBAL:
+  case RISCV::PseudoPBC:
+  case RISCV::PseudoPBU:
+  case RISCV::BMOVC_BEQ:
+  case RISCV::BMOVC_BNE:
+  case RISCV::BMOVC_BLT:
+  case RISCV::BMOVC_BGE:
+  case RISCV::BMOVC_BLTU:
+  case RISCV::BMOVC_BGEU:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool isNonSpecOrDebugInstr(const MachineInstr& MI) {
+  return IsNonSpec(MI.getOpcode()) || MI.isDebugInstr();
+}
+
+MachineBasicBlock::iterator getBMOVSupportInsertLoc(MachineBasicBlock& MBB, MachineBasicBlock::iterator EndIt, int* RegisterNo, bool insertAtEnd = false) {
+  // Base case
+  if (MBB.empty()) {
+    return MBB.end(); // Where the hell else are we going to insert?
+  }
+  MachineBasicBlock::iterator InsertIt = EndIt;
+  uint32_t UsedRegisters = 0;
+  // Walk backwards past non-spec/debug instructions
+  bool First = true;
+  for (auto RI = InsertIt.getReverse(); RI != MBB.rend(); ++RI) {
+    MachineInstr &MI = *RI;
+    if (!isNonSpecOrDebugInstr(MI)) {
+      if (First) {
+        InsertIt = insertAtEnd ? MBB.end() : EndIt;
+      }
+      break;
+    }
+    if (IsNonPseudoNonSpec(MI.getOpcode())) {
+      const Register& BR = MI.getOperand(0).getReg();
+      if (BR.isPhysical()) {
+        UsedRegisters |= (1 << (BR - RISCV::B0));
+      }
+    }
+    InsertIt = MI.getIterator();
+    First = false;
+  }
+  for (unsigned i = 0; i < 32; ++i) {
+    if (!(UsedRegisters & (1 << i))) {
+      *RegisterNo = i;
+      break;
+    }
+  }
+  return InsertIt;
+}
+
+bool RISCVNonSpec::isBMOVC(unsigned opcode) {
+  switch (opcode) {
+  case RISCV::BMOVC_BEQ:
+  case RISCV::BMOVC_BNE:
+  case RISCV::BMOVC_BLT:
+  case RISCV::BMOVC_BGE:
+  case RISCV::BMOVC_BLTU:
+  case RISCV::BMOVC_BGEU:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool RISCVNonSpec::isPB(unsigned opcode) {
+  switch (opcode) {
+  // case RISCV::PBAL: I don't think these will be encountered...
+  case RISCV::PseudoPBC:
+  case RISCV::PseudoPBU:
+    return true;
+  default:
+    return false;
+  }
+}
+
 void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
                                              MachineInstr* MI,
                                              MachineBasicBlock* TargetBB,
@@ -107,31 +192,24 @@ void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
   const DebugLoc DL = MI->getDebugLoc();
-  MCSymbol* Sym = MF->getContext().createTempSymbol(SymbolName);
-  const Register BR = UseVirtualRegisters ? MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) : RISCV::B0;
 
-  // Start from MI
-  MachineBasicBlock::iterator InsertIt = MI->getIterator();
+  int RegisterNo = 0;
+  MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
+    MBB, MI->getIterator(), &RegisterNo, false);
 
-  // Walk backwards past non-spec instructions
-  while (InsertIt != MBB.begin()) {
-    auto Prev = std::prev(InsertIt);
-    if (!IsNonSpec(Prev->getOpcode()))
-      break;
-    InsertIt = Prev;
-  }
-
-  DebugLoc InsertDL = (InsertIt != MBB.end()) ? InsertIt->getDebugLoc() : DL;
+  const Register BR = (UseVirtualRegisters ?
+    MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :
+    Register(RISCV::B0 + RegisterNo));
 
   // bmovs b0, (location of pb)
   MachineInstr *source =
-    BuildMI(MBB, InsertIt, InsertDL, TII->get(RISCV::BMOVS_J))
+    BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BR)
-      .addSym(Sym);
+      .addExternalSymbol(SymbolName);
 
   // bmovt b0, (target)
   MachineInstr *target =
-    BuildMI(MBB, InsertIt, InsertDL, TII->get(RISCV::BMOVT_J))
+    BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVT_J))
       .addUse(BR)
       .addMBB(TargetBB);
 
@@ -139,7 +217,7 @@ void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
   MachineInstr *pb =
     BuildMI(MBB, MI, DL, TII->get(RISCV::PseudoPBU))
       .addUse(BR)
-      .addSym(Sym)
+      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
   // NOTE(non-spec): ^^ we include the target location here so
   //                 that compiler passes will see this as a normal jump
@@ -158,31 +236,24 @@ void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
                                              int* BytesAdded) {
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
-  MCSymbol* Sym = MF->getContext().createTempSymbol(SymbolName);
-  const Register BR = UseVirtualRegisters ? MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) : RISCV::B0;
 
-  // Start from MI
-  MachineBasicBlock::iterator InsertIt = MBB.getLastNonDebugInstr();
+  int RegisterNo = 0;
+  MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
+  MBB, MBB.getLastNonDebugInstr(), &RegisterNo, true);
 
-  // Walk backwards past non-spec instructions
-  while (InsertIt != MBB.begin()) {
-    auto Prev = std::prev(InsertIt);
-    if (!IsNonSpec(Prev->getOpcode()))
-      break;
-    InsertIt = Prev;
-  }
-
-  DebugLoc InsertDL = (InsertIt != MBB.end()) ? InsertIt->getDebugLoc() : DL;
+  const Register BR = (UseVirtualRegisters ?
+    MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :
+    Register(RISCV::B0 + RegisterNo));
 
   // bmovs b0, (location of pb)
-  MachineInstr *source = BuildMI(MBB, InsertIt, DL, TII->get(RISCV::BMOVS_J))
+  MachineInstr *source = BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BR)
-      .addSym(Sym);
+      .addExternalSymbol(SymbolName);
   if (BytesAdded)
     *BytesAdded += TII->getInstSizeInBytes(*source);
 
   // bmovt b0, (target)
-  MachineInstr *target = BuildMI(MBB, InsertIt, DL, TII->get(RISCV::BMOVT_J))
+  MachineInstr *target = BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVT_J))
       .addUse(BR)
       .addMBB(TargetBB);
   if (BytesAdded)
@@ -191,7 +262,7 @@ void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
   // pb b0
   MachineInstr *pb = BuildMI(&MBB, DL, TII->get(RISCV::PseudoPBU))
       .addUse(BR)
-      .addSym(Sym)
+      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
   if (BytesAdded)
     *BytesAdded += TII->getInstSizeInBytes(*pb);
@@ -212,27 +283,27 @@ void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
   const DebugLoc DL = MI->getDebugLoc();
-  MCSymbol* Sym = MF->getContext().createTempSymbol(PBLabelFromPseudoInstrCC(*MI));
-  const Register BR = UseVirtualRegisters ? MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) : RISCV::B0;
 
-  MachineBasicBlock::iterator InsertIt = MI->getIterator();
-  while (InsertIt.isValid() && IsNonSpec(InsertIt->getOpcode())) {
-    --InsertIt;
-  }
-  ++InsertIt;
+  int RegisterNo = 0;
+  MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
+  MBB, MI->getIterator(), &RegisterNo, false);
+
+  const Register BR = (UseVirtualRegisters ?
+    MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :
+    Register(RISCV::B0 + RegisterNo));
 
   // bmovs b0, (location of pb)
-  MachineInstr *source = BuildMI(MBB, InsertIt, DL, TII->get(RISCV::BMOVS_J))
+  MachineInstr *source = BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BR)
-      .addSym(Sym);
+      .addExternalSymbol(PBLabelFromPseudoInstrCC(*MI));
 
   // bmovt b0, (target)
-  MachineInstr *target = BuildMI(MBB, InsertIt, DL, TII->get(RISCV::BMOVT_J))
+  MachineInstr *target = BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVT_J))
       .addUse(BR)
       .addMBB(TargetBB);
 
   // bmovc_bxx b0, rs1, rs2
-  MachineInstr *condition = BuildMI(MBB, InsertIt, DL, TII->get(BMOVCInstrFromPseudoInstr(*MI)))
+  MachineInstr *condition = BuildMI(MBB, SupportIt, DL, TII->get(BMOVCInstrFromPseudoInstr(*MI)))
       .addUse(BR)
       .addReg(rs1)
       .addReg(rs2);
@@ -240,7 +311,7 @@ void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
   // pb b0
   MachineInstr *pb = BuildMI(MBB, MI, DL, TII->get(RISCV::PseudoPBC))
       .addUse(BR)
-      .addSym(Sym)
+      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
   // NOTE(non-spec): ^^ we include the target location here so
   //                 that compiler passes will see this as a normal jump
@@ -261,34 +332,31 @@ void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
                                            int* BytesAdded) {
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
-  MCSymbol* Sym = MF->getContext().createTempSymbol(labelFromCC(CC));
-  const Register BR = UseVirtualRegisters ? MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) : RISCV::B0;
 
-  MachineBasicBlock::iterator InsertIt = MBB.end();
-  for (auto MI = MBB.rbegin(); MI != MBB.rend(); ) {
-    if (!IsNonSpec(MI->getOpcode())) {
-      InsertIt = MI->getIterator();
-      break;
-    }
-  }
-  ++InsertIt;
+  int RegisterNo = 0;
+  MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
+  MBB, MBB.getLastNonDebugInstr(), &RegisterNo, true);
+
+  const Register BR = (UseVirtualRegisters ?
+    MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :
+    Register(RISCV::B0 + RegisterNo));
 
   // bmovs b0, (location of pb)
-  MachineInstr *source = BuildMI(MBB, InsertIt, DL, TII->get(RISCV::BMOVS_J))
+  MachineInstr *source = BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BR)
-      .addSym(Sym);
+      .addExternalSymbol(labelFromCC(CC));
   if (BytesAdded)
     *BytesAdded += TII->getInstSizeInBytes(*source);
 
   // bmovt b0, (target)
-  MachineInstr *target = BuildMI(MBB, InsertIt, DL, TII->get(RISCV::BMOVT_J))
+  MachineInstr *target = BuildMI(MBB, SupportIt, DL, TII->get(RISCV::BMOVT_J))
       .addUse(BR)
       .addMBB(TargetBB);
   if (BytesAdded)
     *BytesAdded += TII->getInstSizeInBytes(*target);
 
-  // bmovc_bxx b0, rs1, rs2
-  MachineInstr *condition = BuildMI(MBB, InsertIt, DL, TII->get(BMOVCInstrFromCC(CC)))
+  // bmovc_b[cond] b0, rs1, rs2
+  MachineInstr *condition = BuildMI(MBB, SupportIt, DL, TII->get(BMOVCInstrFromCC(CC)))
       .addUse(BR)
       .addReg(rs1)
   .addReg(rs2);
@@ -298,7 +366,7 @@ void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
   // pb b0
   MachineInstr *pb = BuildMI(&MBB, DL, TII->get(RISCV::PseudoPBC))
       .addUse(BR)
-      .addSym(Sym)
+      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
   // NOTE(non-spec): ^^ we include the target location here so
   //                 that compiler passes will see this as a normal jump

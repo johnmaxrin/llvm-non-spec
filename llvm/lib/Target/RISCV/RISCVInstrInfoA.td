@@ -383,7 +383,7 @@ class PseudoCmpXchg
   let mayLoad = 1;
   let mayStore = 1;
   let hasSideEffects = 0;
-  let Size = 16;
+  let Size = !add(24, 16);
 }
 
 // Ordering constants must be kept in sync with the AtomicOrdering enum in
@@ -421,7 +421,7 @@ def PseudoMaskedCmpXchg32
   let mayLoad = 1;
   let mayStore = 1;
   let hasSideEffects = 0;
-  let Size = 32;
+  let Size = !add(24, 32);
 }
 
 def : Pat<(int_riscv_masked_cmpxchg_i32

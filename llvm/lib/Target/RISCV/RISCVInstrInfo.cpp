@@ -1034,8 +1034,8 @@ static void parseCondBranch(MachineInstr &LastInst, MachineBasicBlock *&Target,
   Target = MFI->getBranchTarget(&LastInst);
   //Target = LastInst.getOperand(2).getMBB();
   Cond.push_back(MachineOperand::CreateImm(MFI->getBranchOpcode(&LastInst)));
-  Cond.push_back(*MFI->getBranchReg(&LastInst, 0));
-  Cond.push_back(*MFI->getBranchReg(&LastInst, 1));
+  Cond.push_back(MFI->getBranchReg(&LastInst, 0));
+  Cond.push_back(MFI->getBranchReg(&LastInst, 1));
 }
 
 unsigned RISCVCC::getBrCond(RISCVCC::CondCode CC, unsigned SelectOpc) {
@@ -1044,18 +1044,20 @@ unsigned RISCVCC::getBrCond(RISCVCC::CondCode CC, unsigned SelectOpc) {
     switch (CC) {
     default:
       llvm_unreachable("Unexpected condition code!");
+      // TODO [non-spec]: This will almost certainly break things,
+      //                  so find everywhere this function is called!
     case RISCVCC::COND_EQ:
-      return RISCV::BEQ;
+      return RISCV::BMOVC_BEQ;
     case RISCVCC::COND_NE:
-      return RISCV::BNE;
+      return RISCV::BMOVC_BNE;
     case RISCVCC::COND_LT:
-      return RISCV::BLT;
+      return RISCV::BMOVC_BLT;
     case RISCVCC::COND_GE:
-      return RISCV::BGE;
+      return RISCV::BMOVC_BGE;
     case RISCVCC::COND_LTU:
-      return RISCV::BLTU;
+      return RISCV::BMOVC_BLTU;
     case RISCVCC::COND_GEU:
-      return RISCV::BGEU;
+      return RISCV::BMOVC_BGEU;
     }
     break;
   case RISCV::Select_GPR_Using_CC_SImm5_CV:
@@ -1234,37 +1236,34 @@ unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
                                       int *BytesRemoved) const {
   MachineFunction *MF = MBB.getParent();
   RISCVMachineFunctionInfo *MFI = MF->getInfo<RISCVMachineFunctionInfo>();
+  unsigned NumberOfInstructionsRemoved = 0;
 
   if (BytesRemoved)
     *BytesRemoved = 0;
   MachineBasicBlock::iterator I = MBB.getLastNonDebugInstr();
   if (I == MBB.end())
-    return 0;
+    return NumberOfInstructionsRemoved;
 
   if (!I->getDesc().isUnconditionalBranch() &&
       !I->getDesc().isConditionalBranch())
-    return 0;
+    return NumberOfInstructionsRemoved;
 
   // Remove the branch.
-  if (BytesRemoved)
-    *BytesRemoved += getInstSizeInBytes(*I);
   // I->eraseFromParent();
-  MFI->removeBranchComplete(&*I);
+  NumberOfInstructionsRemoved += MFI->removeBranchComplete(&*I, BytesRemoved);
 
   I = MBB.end();
 
   if (I == MBB.begin())
-    return 1;
+    return NumberOfInstructionsRemoved;
   --I;
   if (!I->getDesc().isConditionalBranch())
-    return 1;
+    return NumberOfInstructionsRemoved;
 
   // Remove the branch.
-  if (BytesRemoved)
-    *BytesRemoved += getInstSizeInBytes(*I);
   // I->eraseFromParent();
-  MFI->removeBranchComplete(&*I);
-  return 2;
+  NumberOfInstructionsRemoved += MFI->removeBranchComplete(&*I, BytesRemoved);
+  return NumberOfInstructionsRemoved;
 }
 
 // Inserts a branch into the end of the specific MachineBasicBlock, returning
@@ -1536,7 +1535,7 @@ bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
   if (isFromLoadImm(MRI, LHS, C0) && isFromLoadImm(MRI, RHS, C1)) {
     unsigned NewOpc = evaluateCondBranch(CC, C0, C1) ? RISCV::BEQ : RISCV::BNE;
     // Build the new branch and remove the old one.
-    dbgs() << "TODO: [Non-Spec] replace condition to EQZ or NEZ\n";
+    llvm_unreachable("TODO: [Non-Spec] replace condition to EQZ or NEZ");
     BuildMI(*MBB, MI, MI.getDebugLoc(), get(NewOpc))
         .addReg(RISCV::X0)
         .addReg(RISCV::X0)
@@ -1591,7 +1590,7 @@ bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
       MRI.hasOneUse(LHS.getReg()) && (IsSigned || C0 != -1)) {
     assert(isInt<12>(C0) && "Unexpected immediate");
     if (Register RegZ = searchConst(C0 + 1)) {
-      dbgs() << "TODO: [Non-Spec] replace condition to opposite condition\n";
+      llvm_unreachable("TODO: [Non-Spec] replace condition to opposite condition");
       BuildMI(*MBB, MI, MI.getDebugLoc(), get(NewOpc))
           .add(RHS)
           .addReg(RegZ)
@@ -1613,7 +1612,7 @@ bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
       MRI.hasOneUse(RHS.getReg())) {
     assert(isInt<12>(C0) && "Unexpected immediate");
     if (Register RegZ = searchConst(C0 - 1)) {
-      dbgs() << "TODO: [Non-Spec] replace condition to opposite condition\n";
+      llvm_unreachable("TODO: [Non-Spec] replace condition to opposite condition");
       BuildMI(*MBB, MI, MI.getDebugLoc(), get(NewOpc))
           .addReg(RegZ)
           .add(LHS)

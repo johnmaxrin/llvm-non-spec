@@ -788,7 +788,7 @@ bool RISCVInstructionSelector::select(MachineInstr &MI) {
     Register LHS, RHS;
     RISCVCC::CondCode CC;
     getOperandsForBranch(MI.getOperand(0).getReg(), CC, LHS, RHS, *MRI);
-
+    llvm_unreachable("TODO [non-spec]: insert NonSpec Branch!");
     auto Bcc = MIB.buildInstr(RISCVCC::getBrCond(CC), {}, {LHS, RHS})
                    .addMBB(MI.getOperand(1).getMBB());
     MI.eraseFromParent();

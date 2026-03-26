@@ -248,16 +248,22 @@ static unsigned getInvertedBranchOp(unsigned BrOp) {
   default:
     llvm_unreachable("Unexpected branch opcode!");
   case RISCV::PseudoLongBEQ:
+      llvm_unreachable("TODO [non-spec]");
     return RISCV::BNE;
   case RISCV::PseudoLongBNE:
+      llvm_unreachable("TODO [non-spec]");
     return RISCV::BEQ;
   case RISCV::PseudoLongBLT:
+      llvm_unreachable("TODO [non-spec]");
     return RISCV::BGE;
   case RISCV::PseudoLongBGE:
+      llvm_unreachable("TODO [non-spec]");
     return RISCV::BLT;
   case RISCV::PseudoLongBLTU:
+      llvm_unreachable("TODO [non-spec]");
     return RISCV::BGEU;
   case RISCV::PseudoLongBGEU:
+      llvm_unreachable("TODO [non-spec]");
     return RISCV::BLTU;
   case RISCV::PseudoLongQC_BEQI:
     return RISCV::QC_BNEI;

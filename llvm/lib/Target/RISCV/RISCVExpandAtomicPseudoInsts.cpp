@@ -21,6 +21,8 @@
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 
+#include "llvm/MC/MCContext.h"
+
 using namespace llvm;
 
 #define RISCV_EXPAND_ATOMIC_PSEUDO_NAME                                        \
@@ -267,6 +269,7 @@ static void doAtomicBinOpExpansion(const RISCVInstrInfo *TII, MachineInstr &MI,
   AtomicOrdering Ordering =
       static_cast<AtomicOrdering>(MI.getOperand(4).getImm());
 
+  llvm_unreachable("TODO [non-spec]: replace this");
   // .loop:
   //   lr.[w|d] dest, (addr)
   //   binop scratch, dest, val
@@ -333,6 +336,7 @@ static void doMaskedAtomicBinOpExpansion(const RISCVInstrInfo *TII,
   AtomicOrdering Ordering =
       static_cast<AtomicOrdering>(MI.getOperand(5).getImm());
 
+  llvm_unreachable("TODO [non-spec]: replace this");
   // .loop:
   //   lr.w destreg, (alignedaddr)
   //   binop scratch, destreg, incr
@@ -475,6 +479,7 @@ bool RISCVExpandAtomicPseudo::expandAtomicMinMaxOp(
   AtomicOrdering Ordering =
       static_cast<AtomicOrdering>(MI.getOperand(IsSigned ? 7 : 6).getImm());
 
+  llvm_unreachable("TODO [non-spec]: replace this");
   //
   // .loophead:
   //   lr.w destreg, (alignedaddr)
@@ -658,43 +663,102 @@ bool RISCVExpandAtomicPseudo::expandAtomicCmpXchg(
   AtomicOrdering Ordering =
       static_cast<AtomicOrdering>(MI.getOperand(IsMasked ? 6 : 5).getImm());
 
+  MCSymbol* LoopHeadSym = MF->getContext().createTempSymbol("ns_cmpxchg_loophead_");
+  MCSymbol* LoopTailSym = MF->getContext().createTempSymbol("ns_cmpxchg_looptail_");
+
+  // TODO(non-spec): Find registers to use, rather than picking randomly
+  Register LoopHeadBR = RISCV::B30;
+  Register LoopTailBR = RISCV::B31;
+
+  // bmovs b30, .ns_cmpxchg_loophead
+  // bmovs b31, .ns_cmpxchg_looptail
+  // bmovt b30, .done
+  // bmovt b31, .loophead
+#if 0
+  BuildMI(&MBB, DL, TII->get(RISCV::BMOVS_J))
+      .addDef(LoopHeadBR)
+      .addSym(LoopHeadSym);
+  BuildMI(&MBB, DL, TII->get(RISCV::BMOVT_J))
+      .addDef(LoopHeadBR)
+      .addMBB(LoopHeadBNETarget);
+  BuildMI(&MBB, DL, TII->get(RISCV::BMOVS_J))
+      .addDef(LoopTailBR)
+      .addSym(LoopTailSym);
+  BuildMI(&MBB, DL, TII->get(RISCV::BMOVT_J))
+      .addDef(LoopTailBR)
+      .addMBB(LoopHeadMBB);
+#endif
+
   if (!IsMasked) {
     // .loophead:
     //   lr.[w|d] dest, (addr)
-    //   bne dest, cmpval, done
+    //   bmovc_bne loopheadbr, dest, cmpval
+    //   pb loopheadbr
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BMOVS_J))
+        .addDef(LoopHeadBR)
+        .addSym(LoopHeadSym);
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BMOVT_J))
+        .addDef(LoopHeadBR)
+        .addMBB(LoopHeadBNETarget);
     BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Ordering, Width, STI)),
             DestReg)
         .addReg(AddrReg);
-    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BNE))
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BMOVC_BNE))
+        .addReg(LoopHeadBR)
         .addReg(DestReg)
-        .addReg(CmpValReg)
+        .addReg(CmpValReg);
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::PseudoPBC))
+        .addReg(LoopHeadBR)
+        .addSym(LoopHeadSym)
         .addMBB(LoopHeadBNETarget);
     // .looptail:
     //   sc.[w|d] scratch, newval, (addr)
-    //   bnez scratch, loophead
+    //   bmovc_bne looptailbr, scratch, zero
+    //   pb looptailbr
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BMOVS_J))
+        .addDef(LoopTailBR)
+        .addSym(LoopTailSym);
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BMOVT_J))
+        .addDef(LoopTailBR)
+        .addMBB(LoopHeadMBB);
     BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Ordering, Width, STI)),
             ScratchReg)
         .addReg(AddrReg)
         .addReg(NewValReg);
-    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BNE))
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BMOVC_BNE))
+        .addReg(LoopTailBR)
         .addReg(ScratchReg)
-        .addReg(RISCV::X0)
+        .addReg(RISCV::X0);
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::PseudoPBC))
+        .addReg(LoopTailBR)
+        .addSym(LoopTailSym)
         .addMBB(LoopHeadMBB);
   } else {
     // .loophead:
     //   lr.w dest, (addr)
     //   and scratch, dest, mask
-    //   bne scratch, cmpval, done
+    //   bmovc_bne loopheadbr, scratch, cmpval
+    //   pb loopheadbr
     Register MaskReg = MI.getOperand(5).getReg();
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BMOVS_J))
+        .addDef(LoopHeadBR)
+        .addSym(LoopHeadSym);
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BMOVT_J))
+        .addDef(LoopHeadBR)
+        .addMBB(LoopHeadBNETarget);
     BuildMI(LoopHeadMBB, DL, TII->get(getLRForRMW(Ordering, Width, STI)),
             DestReg)
         .addReg(AddrReg);
     BuildMI(LoopHeadMBB, DL, TII->get(RISCV::AND), ScratchReg)
         .addReg(DestReg)
         .addReg(MaskReg);
-    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BNE))
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::BMOVC_BNE))
+        .addReg(LoopHeadBR)
         .addReg(ScratchReg)
-        .addReg(CmpValReg)
+        .addReg(CmpValReg);
+    BuildMI(LoopHeadMBB, DL, TII->get(RISCV::PseudoPBC))
+        .addReg(LoopHeadBR)
+        .addSym(LoopHeadSym)
         .addMBB(LoopHeadBNETarget);
 
     // .looptail:
@@ -702,16 +766,27 @@ bool RISCVExpandAtomicPseudo::expandAtomicCmpXchg(
     //   and scratch, scratch, mask
     //   xor scratch, dest, scratch
     //   sc.w scratch, scratch, (adrr)
-    //   bnez scratch, loophead
+    //   bmovc_bne looptailbr scratch, zero
+    //   pb looptailbr
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BMOVS_J))
+        .addDef(LoopTailBR)
+        .addSym(LoopTailSym);
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BMOVT_J))
+        .addDef(LoopTailBR)
+        .addMBB(LoopHeadMBB);
     insertMaskedMerge(TII, DL, LoopTailMBB, ScratchReg, DestReg, NewValReg,
                       MaskReg, ScratchReg);
     BuildMI(LoopTailMBB, DL, TII->get(getSCForRMW(Ordering, Width, STI)),
             ScratchReg)
         .addReg(AddrReg)
         .addReg(ScratchReg);
-    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BNE))
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::BMOVC_BNE))
+        .addReg(LoopTailBR)
         .addReg(ScratchReg)
-        .addReg(RISCV::X0)
+        .addReg(RISCV::X0);
+    BuildMI(LoopTailMBB, DL, TII->get(RISCV::PseudoPBC))
+        .addReg(LoopTailBR)
+        .addSym(LoopTailSym)
         .addMBB(LoopHeadMBB);
   }
 

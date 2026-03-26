@@ -16,6 +16,7 @@ List of Implicit LLVM Assumptions that are not documented anywhere:
 - Branch instructions will always hold their branch target
 - All terminators of a basic block will be at the end of a basic block
 - All Phi instructions must be at the beginning of a basic block
+- LLVM will just copy MachineInstr's as it pleases without letting you know
 
 # NOTES TO SELF
 - Try reverting back to old MachineBasicBlock.cpp, I don't think my changes matter anymore..

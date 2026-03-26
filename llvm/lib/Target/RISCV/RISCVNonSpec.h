@@ -22,6 +22,9 @@ namespace llvm {
   public:
     static bool UseVirtualRegisters;
   public:
+    static bool isBMOVC(unsigned opcode);
+    static bool isPB(unsigned opcode);
+  public:
     static void insertUnconditionalBranch(MachineBasicBlock& MBB,
                                           MachineInstr* MI,
                                           MachineBasicBlock* TargetBB,

@@ -314,11 +314,13 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
     // NOTE(non-spec): Insert label to identify the location of PBAL instructions
     if (OutInst.getOpcode() == RISCV::PBAL) {
       MachineOperand Operand = MI->getOperand(1);
-      if (!Operand.isMCSymbol()) {
-        OutStreamer->emitRawComment("NO SYMBOL FOR BMOV INSTRUCTION");
+      if (Operand.isMCSymbol()) {
+        OutStreamer->emitLabel(Operand.getMCSymbol());
       }
       else {
-        OutStreamer->emitLabel(Operand.getMCSymbol());
+        const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
+        MCSymbol* Source = MFI->getBranchSource(const_cast<MachineInstr*>(MI));
+        OutStreamer->emitLabel(Source);
       }
     }
     EmitToStreamer(*OutStreamer, OutInst);
@@ -326,6 +328,16 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
   }
 
   switch (MI->getOpcode()) {
+  case RISCV::BMOVS_J: {
+    const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
+    MFI->fixBranchSource(const_cast<MachineInstr*>(MI));
+    break;
+  }
+  case RISCV::BMOVT_J: {
+    const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
+    MFI->fixBranchTarget(const_cast<MachineInstr*>(MI));
+    break;
+  }
   case RISCV::HWASAN_CHECK_MEMACCESS_SHORTGRANULES:
     LowerHWASAN_CHECK_MEMACCESS(*MI);
     return;

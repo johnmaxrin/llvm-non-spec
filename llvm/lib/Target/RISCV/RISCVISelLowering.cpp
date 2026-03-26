@@ -21517,10 +21517,11 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register FLHS = First.getOperand(1).getReg();
   Register FRHS = First.getOperand(2).getReg();
   // Insert appropriate branch.
-  BuildMI(FirstMBB, DL, TII.get(RISCVCC::getBrCond(FirstCC, First.getOpcode())))
-      .addReg(FLHS)
-      .addReg(FRHS)
-      .addMBB(SinkMBB);
+  RISCVNonSpec::insertConditionalBranch(*FirstMBB, DL, FirstCC, FLHS, FRHS, SinkMBB, nullptr);
+  //BuildMI(FirstMBB, DL, TII.get(RISCVCC::getBrCond(FirstCC, First.getOpcode())))
+  //    .addReg(FLHS)
+  //    .addReg(FRHS)
+  //    .addMBB(SinkMBB);
 
   Register SLHS = Second.getOperand(1).getReg();
   Register SRHS = Second.getOperand(2).getReg();
@@ -21528,12 +21529,13 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register Op1Reg5 = First.getOperand(5).getReg();
 
   auto SecondCC = static_cast<RISCVCC::CondCode>(Second.getOperand(3).getImm());
+  RISCVNonSpec::insertConditionalBranch(*ThisMBB, DL, SecondCC, SLHS, SRHS, SinkMBB, nullptr);
   // Insert appropriate branch.
-  BuildMI(ThisMBB, DL,
-          TII.get(RISCVCC::getBrCond(SecondCC, Second.getOpcode())))
-      .addReg(SLHS)
-      .addReg(SRHS)
-      .addMBB(SinkMBB);
+  //BuildMI(ThisMBB, DL,
+  //        TII.get(RISCVCC::getBrCond(SecondCC, Second.getOpcode())))
+  //    .addReg(SLHS)
+  //    .addReg(SRHS)
+  //    .addMBB(SinkMBB);
 
   Register DestReg = Second.getOperand(0).getReg();
   Register Op2Reg4 = Second.getOperand(4).getReg();
