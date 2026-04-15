@@ -780,6 +780,7 @@ void RISCVAsmPrinter::EmitHwasanMemaccessSymbols(Module &M) {
     OutStreamer->emitSymbolAttribute(Sym, MCSA_Weak);
     OutStreamer->emitSymbolAttribute(Sym, MCSA_Hidden);
     OutStreamer->emitLabel(Sym);
+    llvm_unreachable("TODO [non-spec]");
 
     // Extract shadow offset from ptr
     EmitToStreamer(

@@ -56,6 +56,15 @@ public:
                           SmallVectorImpl<MCFixup> &Fixups,
                           const MCSubtargetInfo &STI) const;
 
+  void expandReturn(const MCInst &MI, SmallVectorImpl<char> &CB,
+                    SmallVectorImpl<MCFixup> &Fixups,
+                    const MCSubtargetInfo &STI) const;
+
+  void expandIndirect(const MCInst &MI, SmallVectorImpl<char> &CB,
+                      SmallVectorImpl<MCFixup> &Fixups,
+                      const MCSubtargetInfo &STI,
+                      MCRegister Ra) const;
+
   void expandTLSDESCCall(const MCInst &MI, SmallVectorImpl<char> &CB,
                          SmallVectorImpl<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const;
@@ -181,13 +190,76 @@ void RISCVMCCodeEmitter::expandFunctionCall(const MCInst &MI,
   Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
   support::endian::write(CB, Binary, llvm::endianness::little);
 
+  // Emit BMOVT B0, Ra, 0
+  TmpInst = MCInstBuilder(RISCV::BMOVT_I).addReg(RISCV::B0).addReg(Ra).addImm(0);
+  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+
+  // Emit BMOVS B0, 8
+  TmpInst = MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8);
+  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+
+  // Emit BMOVC_BEQ B0, ZERO, ZERO
+  TmpInst = MCInstBuilder(RISCV::BMOVC_BEQ).addReg(RISCV::B0).addReg(RISCV::X0).addReg(RISCV::X0);
+  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+
   if (MI.getOpcode() == RISCV::PseudoTAIL ||
-      MI.getOpcode() == RISCV::PseudoJump)
-    // Emit JALR X0, Ra, 0
-    TmpInst = MCInstBuilder(RISCV::JALR).addReg(RISCV::X0).addReg(Ra).addImm(0);
-  else
-    // Emit JALR Ra, Ra, 0
-    TmpInst = MCInstBuilder(RISCV::JALR).addReg(Ra).addReg(Ra).addImm(0);
+      MI.getOpcode() == RISCV::PseudoJump) {
+    // Emit PBAL (JALR X0, Ra, 0)
+    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0);
+    Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+    support::endian::write(CB, Binary, llvm::endianness::little);
+  }
+  else if (MI.getOpcode() == RISCV::PseudoCALL) {
+    // Emit PBAL (JALR Ra, Ra, 0)
+    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0);
+    Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+    support::endian::write(CB, Binary, llvm::endianness::little);
+  }
+}
+
+void RISCVMCCodeEmitter::expandReturn(const MCInst &MI,
+                                      SmallVectorImpl<char> &CB,
+                                      SmallVectorImpl<MCFixup> &Fixups,
+                                      const MCSubtargetInfo &STI) const {
+  // Emit BMOVS B0, 8
+  MCInst TmpInst = MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8);
+  uint32_t Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+
+  // Emit BMOVT B0, Ra, 0
+  TmpInst = MCInstBuilder(RISCV::BMOVT_I).addReg(RISCV::B0).addReg(RISCV::X1).addImm(0);
+  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+
+  // Emit PBAL (JALR X0, Ra, 0)
+  TmpInst = MCInstBuilder(RISCV::PBAL).addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0);
+  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+}
+
+void RISCVMCCodeEmitter::expandIndirect(const MCInst &MI,
+                                        SmallVectorImpl<char> &CB,
+                                        SmallVectorImpl<MCFixup> &Fixups,
+                                        const MCSubtargetInfo &STI,
+                                        MCRegister Ra) const {
+  // JALR X1, GPR:$rs1, 0
+  MCRegister Rs1 = MI.getOperand(0).getReg();
+
+  // Emit BMOVS B0, 8
+  MCInst TmpInst = MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8);
+  uint32_t Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+
+  // Emit BMOVT B0, Rs1, 0
+  TmpInst = MCInstBuilder(RISCV::BMOVT_I).addReg(RISCV::B0).addReg(Rs1).addImm(0);
+  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  support::endian::write(CB, Binary, llvm::endianness::little);
+
+  // Emit PBAL B0, RA
+  TmpInst = MCInstBuilder(RISCV::PBAL).addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0);
   Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
   support::endian::write(CB, Binary, llvm::endianness::little);
 }
@@ -299,6 +371,7 @@ void RISCVMCCodeEmitter::expandLongCondBr(const MCInst &MI,
                                           SmallVectorImpl<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
   // TODO(non-spec): replace jumps with PBAL
+  llvm_unreachable("Non-Spec TODO, lond cond br");
   MCRegister SrcReg1 = MI.getOperand(0).getReg();
   MCRegister SrcReg2 = MI.getOperand(1).getReg();
   MCOperand SrcSymbol = MI.getOperand(2);
@@ -418,7 +491,28 @@ void RISCVMCCodeEmitter::encodeInstruction(const MCInst &MI,
   case RISCV::PseudoTAIL:
   case RISCV::PseudoJump:
     expandFunctionCall(MI, CB, Fixups, STI);
-    MCNumEmitted += 2;
+    MCNumEmitted += 5; // auipc, bmovt, bmovs, (beq), pbal
+    return;
+  case RISCV::PseudoRET:
+    expandReturn(MI, CB, Fixups, STI);
+    return;
+  case RISCV::PseudoBRIND:
+  case RISCV::PseudoBRINDX7:
+  case RISCV::PseudoBRINDNonX7:
+    expandIndirect(MI, CB, Fixups, STI, RISCV::X0);
+    MCNumEmitted += 3; // bmovs, bmovt, pbal
+    return;
+  case RISCV::PseudoCALLIndirect:
+  case RISCV::PseudoCALLIndirectX7:
+  case RISCV::PseudoCALLIndirectNonX7:
+    expandIndirect(MI, CB, Fixups, STI, RISCV::X1);
+    MCNumEmitted += 3; // bmovs, bmovt, pbal
+    return;
+  case RISCV::PseudoTAILIndirect:
+  case RISCV::PseudoTAILIndirectX7:
+  case RISCV::PseudoTAILIndirectNonX7:
+    expandIndirect(MI, CB, Fixups, STI, RISCV::X0);
+    MCNumEmitted += 3;
     return;
   case RISCV::PseudoAddTPRel:
     expandAddTPRel(MI, CB, Fixups, STI);

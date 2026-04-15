@@ -64,6 +64,12 @@ enum Op {
   ADDI = 0x13,
   AUIPC = 0x17,
   JALR = 0x67,
+  BMOVS_J = 0b0001011, // custom-0 (left 5 is 0x02)
+  BMOVT_J = 0b0101011, // custom-1 (0x0a)
+  BMOV_I  = 0b1011011, // custom-2 (0x16)
+  PB      = 0b1111011, // custom-3 (0x1e)
+  BMOVC_R = 0b1010111, // reserved (0x15)
+  BMOVC_I = 0b1110111, // reserved (0x1d)
   LD = 0x3003,
   LUI = 0x37,
   LW = 0x2003,
@@ -100,6 +106,14 @@ static uint32_t utype(uint32_t op, uint32_t rd, uint32_t imm) {
 // Extract bits v[begin:end], where range is inclusive, and begin must be < 63.
 static uint32_t extractBits(uint64_t v, uint32_t begin, uint32_t end) {
   return (v & ((1ULL << (begin + 1)) - 1)) >> end;
+}
+static uint32_t jtype(uint32_t op, uint32_t rd, uint32_t imm) {
+  uint32_t imm_20    = extractBits(imm, 20, 20);
+  uint32_t imm_10_1  = extractBits(imm, 10, 1);
+  uint32_t imm_11    = extractBits(imm, 11, 11);
+  uint32_t imm_19_12 = extractBits(imm, 19, 12);
+  uint32_t jimm = (imm_20 << 31) | (imm_10_1 << 21) | (imm_11 << 20) | (imm_19_12 << 12);
+  return op | (rd << 7) | jimm;
 }
 
 static uint32_t setLO12_I(uint32_t insn, uint32_t imm) {
@@ -239,7 +253,10 @@ void RISCV::writePltHeader(uint8_t *buf) const {
   write32le(buf + 16, itype(ADDI, X_T0, X_T2, lo12(offset)));
   write32le(buf + 20, itype(SRLI, X_T1, X_T1, ctx.arg.is64 ? 1 : 2));
   write32le(buf + 24, itype(load, X_T0, X_T0, ctx.arg.wordsize));
-  write32le(buf + 28, itype(JALR, 0, X_T3, 0));
+  // JALR, x0, t3, 0
+  write32le(buf + 28, jtype(BMOVS_J, 0, 8));
+  write32le(buf + 32, itype(BMOV_I, 0, X_T3, 0));
+  write32le(buf + 36, rtype(PB, 0, 0, 0));
 }
 
 void RISCV::writePlt(uint8_t *buf, const Symbol &sym,
@@ -251,8 +268,11 @@ void RISCV::writePlt(uint8_t *buf, const Symbol &sym,
   uint32_t offset = sym.getGotPltVA(ctx) - pltEntryAddr;
   write32le(buf + 0, utype(AUIPC, X_T3, hi20(offset)));
   write32le(buf + 4, itype(ctx.arg.is64 ? LD : LW, X_T3, X_T3, lo12(offset)));
-  write32le(buf + 8, itype(JALR, X_T1, X_T3, 0));
-  write32le(buf + 12, itype(ADDI, 0, 0, 0));
+  // JALR, x1, t3, 0
+  write32le(buf + 8, jtype(BMOVS_J, 0, 8));
+  write32le(buf + 12, itype(BMOV_I, 0, X_T3, 0));
+  write32le(buf + 16, rtype(PB, X_RA, 0, 0));
+  write32le(buf + 20, itype(ADDI, 0, 0, 0));
 }
 
 RelType RISCV::getDynRel(RelType type) const {
@@ -735,7 +755,7 @@ static void relaxCall(Ctx &ctx, const InputSection &sec, size_t i, uint64_t loc,
   const bool rvc = getEFlags(ctx, sec.file) & EF_RISCV_RVC;
   const Symbol &sym = *r.sym;
   const uint64_t insnPair = read64le(sec.content().data() + r.offset);
-  const uint32_t rd = extractBits(insnPair, 32 + 11, 32 + 7);
+  uint32_t rd = extractBits(insnPair, 32 + 19, 32 + 15);
   const uint64_t dest =
       (r.expr == R_PLT_PC ? sym.getPltVA(ctx) : sym.getVA(ctx)) + r.addend;
   const int64_t displace = dest - loc;
@@ -743,17 +763,20 @@ static void relaxCall(Ctx &ctx, const InputSection &sec, size_t i, uint64_t loc,
   // When the caller specifies the old value of `remove`, disallow its
   // increment.
   if (remove >= 6 && rvc && isInt<12>(displace) && rd == 0) {
+    llvm_unreachable("TODO [non-spec]");
     sec.relaxAux->relocTypes[i] = R_RISCV_RVC_JUMP;
     sec.relaxAux->writes.push_back(0xa001); // c.j
     remove = 6;
   } else if (remove >= 6 && rvc && isInt<12>(displace) && rd == X_RA &&
              !ctx.arg.is64) { // RV32C only
+    llvm_unreachable("TODO [non-spec]");
     sec.relaxAux->relocTypes[i] = R_RISCV_RVC_JUMP;
     sec.relaxAux->writes.push_back(0x2001); // c.jal
     remove = 6;
   } else if (remove >= 4 && isInt<21>(displace)) {
     sec.relaxAux->relocTypes[i] = R_RISCV_JAL;
-    sec.relaxAux->writes.push_back(0x6f | rd << 7); // jal
+    rd = 0; // Use B0
+    sec.relaxAux->writes.push_back(0b0101011 | rd << 7); // bmovt
     remove = 4;
   } else {
     remove = 0;
