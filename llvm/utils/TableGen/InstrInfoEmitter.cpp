@@ -1150,6 +1150,8 @@ void InstrInfoEmitter::emitRecord(
     OS << "|(1ULL<<MCID::Select)";
   if (Inst.isBarrier)
     OS << "|(1ULL<<MCID::Barrier)";
+  if (Inst.isBMOV)
+    OS << "|(1ULL<<MCID::BMOV)";
   if (Inst.hasDelaySlot)
     OS << "|(1ULL<<MCID::DelaySlot)";
   if (Inst.isCall)

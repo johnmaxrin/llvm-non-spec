@@ -212,7 +212,7 @@ void RISCVMCCodeEmitter::expandFunctionCall(const MCInst &MI,
     Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
     support::endian::write(CB, Binary, llvm::endianness::little);
   }
-  else if (MI.getOpcode() == RISCV::PseudoCALL) {
+  else {
     // Emit PBAL (JALR Ra, Ra, 0)
     TmpInst = MCInstBuilder(RISCV::PBAL).addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0);
     Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);

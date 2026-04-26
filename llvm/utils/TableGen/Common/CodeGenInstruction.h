@@ -247,6 +247,7 @@ public:
   bool isBitcast : 1;
   bool isSelect : 1;
   bool isBarrier : 1;
+  bool isBMOV : 1;
   bool isCall : 1;
   bool isAdd : 1;
   bool isTrap : 1;

@@ -630,6 +630,7 @@ class Instruction : InstructionEncoding {
 
   // These bits capture information about the high-level semantics of the
   // instruction.
+  bit isBMOV       = false;     // Is this instruction a BMOV instruction?
   bit isReturn     = false;     // Is this instruction a return instruction?
   bit isBranch     = false;     // Is this instruction a branch instruction?
   bit isEHScopeReturn = false;  // Does this instruction end an EH scope?

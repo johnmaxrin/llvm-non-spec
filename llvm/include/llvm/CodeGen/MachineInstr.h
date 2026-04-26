@@ -973,6 +973,10 @@ public:
     return hasProperty(MCID::Terminator, Type);
   }
 
+  bool isBMOV(QueryType Type = AnyInBundle) const {
+    return hasProperty(MCID::BMOV, Type);
+  }
+
   /// Returns true if this is a conditional, unconditional, or indirect branch.
   /// Predicates below can be used to discriminate between
   /// these cases, and the TargetInstrInfo::analyzeBranch method can be used to

@@ -450,6 +450,7 @@ CodeGenInstruction::CodeGenInstruction(const Record *R)
   isConvertibleToThreeAddress = R->getValueAsBit("isConvertibleToThreeAddress");
   isCommutable = R->getValueAsBit("isCommutable");
   isTerminator = R->getValueAsBit("isTerminator");
+  isBMOV = R->getValueAsBit("isBMOV");
   isReMaterializable = R->getValueAsBit("isReMaterializable");
   hasDelaySlot = R->getValueAsBit("hasDelaySlot");
   usesCustomInserter = R->getValueAsBit("usesCustomInserter");

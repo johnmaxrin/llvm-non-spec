@@ -243,7 +243,7 @@ MachineBasicBlock::iterator MachineBasicBlock::getFirstTerminator() {
   iterator B = begin(), E = end(), I = E;
   while (I != B && ((--I)->isTerminator() || I->isDebugInstr()))
     ; /*noop */
-  while (I != E && !I->isTerminator())
+  while (I != E && !I->isTerminator() && !I->isBMOV())
     ++I;
   return I;
 }
@@ -1496,7 +1496,7 @@ void MachineBasicBlock::ReplaceUsesOfBlockWith(MachineBasicBlock *Old,
     --I;
     // NOTE: [Non-Spec] I don't know the consequences of this change!
     //       This has the potential to break many things!
-    if (!I->isTerminator()) continue;
+    if (!I->isTerminator() && !I->isBMOV()) break;
 
     // Scan the operands of this machine instruction, replacing any uses of Old
     // with New.

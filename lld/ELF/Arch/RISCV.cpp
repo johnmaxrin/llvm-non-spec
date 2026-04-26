@@ -149,8 +149,8 @@ RISCV::RISCV(Ctx &ctx) : TargetInfo(ctx) {
   // .got.plt[0] = _dl_runtime_resolve, .got.plt[1] = link_map
   gotPltHeaderEntriesNum = 2;
 
-  pltHeaderSize = 32;
-  pltEntrySize = 16;
+  pltHeaderSize = 40;
+  pltEntrySize = 24;
   ipltEntrySize = 16;
 }
 

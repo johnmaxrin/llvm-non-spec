@@ -620,7 +620,7 @@ include "RISCVInstrFormatsV.td"
 // OPC_OP_V  shares same opcode as OP_BMOVC_R
 // OPC_OP_VE shares same opcode as OP_BMOVC_I
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let isBMOV = 1, hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
 class BMOVC_rri<bits<3> funct3, string opcodestr>
     : RVInstR<0b0000000, funct3, OPC_OP_V, (outs),
             (ins PBR:$rd, GPR:$rs1, GPR:$rs2), opcodestr, "$rd, $rs1, $rs2">;
@@ -771,7 +771,7 @@ def BGEU : BranchCC_rri<0b111, "bgeu">;
 // Non-Spec Instructions
 //===----------------------------------------------------------------------===//
 
-let hasSideEffects = 1 , mayLoad = 0, mayStore = 0 in {
+let isBMOV = 1, hasSideEffects = 1 , mayLoad = 0, mayStore = 0 in {
 def BMOVT_J : RVInstJ<OPC_CUSTOM_1, (outs), (ins PBR:$rd, simm21_lsb0_jal:$imm20),
 								"bmovt", "$rd, $imm20">, Sched<[WriteJal]>;
 def BMOVT_I : RVInstI<0b001, OPC_CUSTOM_2, (outs), (ins PBR:$rd, GPR:$rs1, simm12:$imm12),
@@ -1139,7 +1139,7 @@ def : InstAlias<"jr ${offset}(${rs})",   (JALR      X0, GPR:$rs, simm12:$offset)
 def : InstAlias<"jalr $rs",              (JALR      X1, GPR:$rs, 0), 3>;
 def : InstAlias<"jalr ${offset}(${rs})", (JALR      X1, GPR:$rs, simm12:$offset)>;
 def : InstAlias<"jalr $rd, $rs",         (JALR GPR:$rd, GPR:$rs, 0), 2>;
-def : InstAlias<"ret",                   (JALR      X0,      X1, 0), 4>;
+def : InstAlias<"jret",                  (JALR      X0,      X1, 0), 4>;
 
 // Non-canonical forms for jump targets also accepted by the assembler.
 def : InstAlias<"jr $rs, $offset",        (JALR      X0, GPR:$rs, simm12:$offset), 0>;
@@ -1805,10 +1805,10 @@ def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, simm21_lsb0_jal:$imm
 
 let isCall = 1, Defs = [X1], isCodeGenOnly = 0, Size = 16 in
 def PseudoCALL : Pseudo<(outs), (ins call_symbol:$func), [],
-                        "pbtbcall", "$func">, Sched<[WriteIALU, WriteJalr, ReadJalr]>;
+                        "call", "$func">, Sched<[WriteIALU, WriteJalr, ReadJalr]>;
 
-let isBarrier = 1, isReturn = 1, isTerminator = 1, Size = 12 in
-def PseudoRET : Pseudo<(outs), (ins), [(riscv_ret_glue)], "pbtbret">;
+let isBarrier = 1, isReturn = 1, isTerminator = 1, isCodeGenOnly = 0, Size = 12 in
+def PseudoRET : Pseudo<(outs), (ins), [(riscv_ret_glue)], "ret">;
 
 let isBarrier = 1, isBranch = 1, isTerminator = 1, usesCustomInserter = 1 in
 def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>;

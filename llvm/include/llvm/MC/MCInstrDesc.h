@@ -188,6 +188,7 @@ enum Flag {
   Trap,
   VariadicOpsAreDefs,
   Authenticated,
+  BMOV,
 };
 } // namespace MCID
 
@@ -300,6 +301,7 @@ public:
   /// Various passes use this to insert code into the bottom of a basic block,
   /// but before control flow occurs.
   bool isTerminator() const { return Flags & (1ULL << MCID::Terminator); }
+  bool isBMOV() const { return Flags & (1ULL << MCID::BMOV); }
 
   /// Returns true if this is a conditional, unconditional, or
   /// indirect branch.  Predicates below can be used to discriminate between
