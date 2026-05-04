@@ -1,5 +1,10 @@
 //===-- RISCVNonSpec.h - RISC-V Non Spec Implementation ---------*- C++ -*-===//
 
+// TODO 
+// 1. Undetstand the flow 
+// 2. Setup the workflow
+
+
 #include "RISCVNonSpec.h"
 #include "MCTargetDesc/RISCVMatInt.h"
 #include "RISCVMachineFunctionInfo.h"
