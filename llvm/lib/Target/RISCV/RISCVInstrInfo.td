@@ -1792,7 +1792,6 @@ def PseudoLongBGEU : LongBccPseudo;
 /*
     PB   Unconditional -> PBU
     PB   Conditional   -> PBC
-    PBAL Unconditional -> PBALU
 */
 
 let isBarrier = 0, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
