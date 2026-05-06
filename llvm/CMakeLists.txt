@@ -532,6 +532,7 @@ set(LLVM_ALL_TARGETS
   Mips
   MSP430
   NVPTX
+  NonSpec
   PowerPC
   RISCV
   Sparc
