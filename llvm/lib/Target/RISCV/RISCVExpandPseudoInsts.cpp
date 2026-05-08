@@ -44,6 +44,8 @@ private:
   bool expandMBB(MachineBasicBlock &MBB);
   bool expandMI(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
                 MachineBasicBlock::iterator &NextMBBI);
+  bool expandCall(MachineBasicBlock &MBB,
+                  MachineBasicBlock::iterator MBBI);
   bool expandCCOp(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
                   MachineBasicBlock::iterator &NextMBBI);
   bool expandVMSET_VMCLR(MachineBasicBlock &MBB,
@@ -110,6 +112,8 @@ bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
   // expanded instructions for each pseudo is correct in the Size field of the
   // tablegen definition for the pseudo.
   switch (MBBI->getOpcode()) {
+  case RISCV::PseudoCALL:
+    return expandCall(MBB, MBBI);
   case RISCV::PseudoMV_FPR16INX:
     return expandMV_FPR16INX(MBB, MBBI);
   case RISCV::PseudoMV_FPR32INX:
@@ -304,6 +308,61 @@ bool RISCVExpandPseudo::expandMV_FPR16INX(MachineBasicBlock &MBB,
       .addImm(0);
 
   MBBI->eraseFromParent(); // The pseudo instruction is gone now.
+  return true;
+}
+
+bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
+                                   MachineBasicBlock::iterator MBBI) {
+  MCInst TmpInst;
+  MachineOperand* Func;
+  MCRegister Ra;
+  if (MBBI->getOpcode() == RISCV::PseudoTAIL) {
+    Func = &MBBI->getOperand(0);
+    Ra = RISCVII::getTailExpandUseRegNo(STI->getFeatureBits());
+  } else if (MBBI->getOpcode() == RISCV::PseudoCALLReg) {
+    Func = &MBBI->getOperand(1);
+    Ra = MBBI->getOperand(0).getReg();
+  } else if (MBBI->getOpcode() == RISCV::PseudoCALL) {
+    Func = &MBBI->getOperand(0);
+    Ra = RISCV::X1;
+  } else if (MBBI->getOpcode() == RISCV::PseudoJump) {
+    Func = &MBBI->getOperand(1);
+    Ra = MBBI->getOperand(0).getReg();
+  }
+
+  DebugLoc DL = MBBI->getDebugLoc();
+
+  // Emit BMOVS B0, 8
+  BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
+      .addDef(RISCV::B0)
+      .addExternalSymbol("call");
+
+  // Emit AUIPC Ra, Func with R_RISCV_CALL relocation type.
+  BuildMI(MBB, MBBI, DL, TII->get(RISCV::AUIPC), Ra)
+      ->addOperand(*Func);
+
+  // Emit BMOVT B0, Ra, 0
+  BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_I))
+      .addReg(RISCV::B0)
+      .addReg(Ra)
+      .addImm(0);
+
+  //if (MI.getOpcode() == RISCV::PseudoTAIL ||
+  //    MI.getOpcode() == RISCV::PseudoJump) {
+  //  // Emit PBAL (JALR X0, Ra, 0)
+  //  TmpInst = MCInstBuilder(RISCV::PBAL).addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0);
+  //  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
+  //  support::endian::write(CB, Binary, llvm::endianness::little);
+  //}
+  //else {
+  // Emit PBAL (JALR Ra, Ra, 0)
+  BuildMI(MBB, MBBI, DL, TII->get(RISCV::PBAL))
+      .addReg(Ra)
+      .addReg(RISCV::B0)
+      .addReg(RISCV::X0);
+  //}
+
+  MBBI->eraseFromParent();
   return true;
 }
 

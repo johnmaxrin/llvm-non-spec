@@ -328,6 +328,12 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
   }
 
   switch (MI->getOpcode()) {
+  case RISCV::PBAL: {
+    const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
+    MCSymbol* Source = MFI->getBranchSource(const_cast<MachineInstr*>(MI));
+    OutStreamer->emitLabel(Source);
+    break;
+  }
   case RISCV::BMOVS_J: {
     const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
     MFI->fixBranchSource(const_cast<MachineInstr*>(MI));

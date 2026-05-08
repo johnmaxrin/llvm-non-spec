@@ -755,7 +755,11 @@ static void relaxCall(Ctx &ctx, const InputSection &sec, size_t i, uint64_t loc,
   const bool rvc = getEFlags(ctx, sec.file) & EF_RISCV_RVC;
   const Symbol &sym = *r.sym;
   const uint64_t insnPair = read64le(sec.content().data() + r.offset);
+
+  // Ensure we are reading a BMOVT_I instruction.
+  assert(0b1011011 == extractBits(insnPair, 32 + 6, 32 + 0));
   uint32_t rd = extractBits(insnPair, 32 + 19, 32 + 15);
+
   const uint64_t dest =
       (r.expr == R_PLT_PC ? sym.getPltVA(ctx) : sym.getVA(ctx)) + r.addend;
   const int64_t displace = dest - loc;
@@ -779,6 +783,7 @@ static void relaxCall(Ctx &ctx, const InputSection &sec, size_t i, uint64_t loc,
     sec.relaxAux->writes.push_back(0b0101011 | rd << 7); // bmovt
     remove = 4;
   } else {
+    llvm_unreachable("TODO [non-spec] We must change BMOVS to be +4 here!");
     remove = 0;
   }
 }

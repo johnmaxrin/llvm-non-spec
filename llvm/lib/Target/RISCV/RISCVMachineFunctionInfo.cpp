@@ -152,6 +152,12 @@ bool RISCVMachineFunctionInfo::isSExt32Register(Register Reg) const {
 
 #define DEBUG_TYPE "ir"
 
+static inline Register getPBBranchRegister(const MachineInstr* MI) {
+  if (MI->getOpcode() == RISCV::PBAL) {
+    return MI->getOperand(1).getReg();
+  }
+  return MI->getOperand(0).getReg();
+}
 void RISCVMachineFunctionInfo::setBranch(MachineInstr* PB, MachineInstr* Source, MachineInstr* Target, MachineInstr* Condition) {
   //assert(Source->getOperand(1).isMCSymbol());
   assert(Target->getOperand(1).isMBB());
@@ -161,7 +167,7 @@ void RISCVMachineFunctionInfo::setBranch(MachineInstr* PB, MachineInstr* Source,
 }
 MCSymbol* RISCVMachineFunctionInfo::getBranchSource(MachineInstr* PB) const {
   MachineBasicBlock *MBB = PB->getParent();
-  Register Reg = PB->getOperand(0).getReg();
+  Register Reg = getPBBranchRegister(PB);
   for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
     MachineInstr& MI = *It;
     if (MI.getOpcode() != RISCV::BMOVS_J)
@@ -179,7 +185,7 @@ void RISCVMachineFunctionInfo::fixBranchSource(MachineInstr *BMOVS) const {
     MachineInstr& MI = *It;
     if (!RISCVNonSpec::isPB(MI.getOpcode()))
       continue;
-    if (MI.getOperand(0).getReg() != Reg)
+    if (getPBBranchRegister(&MI) != Reg)
       continue;
     getBranchSource(&MI, BMOVS);
     return;
@@ -220,7 +226,7 @@ MachineBasicBlock* RISCVMachineFunctionInfo::getBranchTarget(const MachineInstr*
 }
 unsigned RISCVMachineFunctionInfo::getBranchOpcode(const MachineInstr *PB) const {
   const MachineBasicBlock *MBB = PB->getParent();
-  Register Reg = PB->getOperand(0).getReg();
+  Register Reg = getPBBranchRegister(PB);
   for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
     const MachineInstr& MI = *It;
     if (!RISCVNonSpec::isBMOVC(MI.getOpcode()))
@@ -236,7 +242,7 @@ RISCVCC::CondCode RISCVMachineFunctionInfo::getBranchCond(const MachineInstr* PB
 }
 const MachineOperand& RISCVMachineFunctionInfo::getBranchReg(const MachineInstr* PB, int Index) const {
   const MachineBasicBlock *MBB = PB->getParent();
-  Register Reg = PB->getOperand(0).getReg();
+  Register Reg = getPBBranchRegister(PB);
   for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
     const MachineInstr& MI = *It;
     if (!RISCVNonSpec::isBMOVC(MI.getOpcode()))
@@ -285,7 +291,7 @@ RISCVMachineFunctionInfo::BMOVSupport RISCVMachineFunctionInfo::getBMOVSupport(M
   bool WantCondition = PB->getOpcode() == RISCV::PseudoPBC;
 
   MachineBasicBlock *MBB = PB->getParent();
-  Register Reg = PB->getOperand(0).getReg();
+  Register Reg = getPBBranchRegister(PB);
   for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
     MachineInstr& MI = *It;
     switch (MI.getOpcode()) {

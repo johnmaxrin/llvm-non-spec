@@ -176,7 +176,7 @@ bool RISCVNonSpec::isBMOVC(unsigned opcode) {
 
 bool RISCVNonSpec::isPB(unsigned opcode) {
   switch (opcode) {
-  // case RISCV::PBAL: I don't think these will be encountered...
+  case RISCV::PBAL:
   case RISCV::PseudoPBC:
   case RISCV::PseudoPBU:
     return true;
