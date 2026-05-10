@@ -1,34 +1,30 @@
 #include "llvm/TextAPI/Target.h"
-
-using namespace llvm;
-
-Target &llvm::getTheNonSpecTarget()
-{
-    static Target TheNonSpecTarget;
-    return TheNonSpecTarget;
-}
-
-
-
-
-#include "TargetInfo/NVPTXTargetInfo.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Compiler.h"
+
+#include "TargetInfo/NonSpecTargetInfo.h"
+
+
+
 using namespace llvm;
 
-Target &llvm::getTheNVPTXTarget32() {
-  static Target TheNVPTXTarget32;
-  return TheNVPTXTarget32;
-}
-Target &llvm::getTheNVPTXTarget64() {
-  static Target TheNVPTXTarget64;
-  return TheNVPTXTarget64;
+Target &llvm::getTheNonSpecTarget32()
+{
+    static Target TheNonSpecTarget32;
+    return TheNonSpecTarget32;
 }
 
+Target &llvm::getTheNonSpecTarget64()
+{
+    static Target TheNonSpecTarget64;
+    return TheNonSpecTarget64;
+}
+
+
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void
-LLVMInitializeNVPTXTargetInfo() {
-  RegisterTarget<Triple::nvptx> X(getTheNVPTXTarget32(), "nvptx",
-                                  "NVIDIA PTX 32-bit", "NVPTX");
-  RegisterTarget<Triple::nvptx64> Y(getTheNVPTXTarget64(), "nvptx64",
-                                    "NVIDIA PTX 64-bit", "NVPTX");
+LLVMInitializeNonSpecTargetInfo() {
+  RegisterTarget<Triple::riscv32_non_spec> X(getTheNonSpecTarget32(), "nonspec",
+                                  "NON SPEC 32-bit", "NONSPEC");
+  RegisterTarget<Triple::riscv64_non_spec> Y(getTheNonSpecTarget64(), "nonspec",
+                                    "NON SPEC 64-bit", "NONSPEC");
 }

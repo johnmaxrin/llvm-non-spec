@@ -77,8 +77,8 @@ public:
     amdgcn,         // AMDGCN: AMD GCN GPUs
     riscv32,        // RISC-V (32-bit): riscv32
     riscv64,        // RISC-V (64-bit): riscv64
-    riscv32_non_spec // RISC-V Non Speculative (32-bit): riscv32
-    riscv64_non_spec // RISC-V Non Speculative (64-bit): riscv64
+    riscv32_non_spec, // RISC-V Non Speculative (32-bit): riscv32
+    riscv64_non_spec, // RISC-V Non Speculative (64-bit): riscv64
     sparc,          // Sparc: sparc
     sparcv9,        // Sparcv9: Sparcv9
     sparcel,        // Sparc: (endianness = little). NB: 'Sparcle' is a CPU variant
