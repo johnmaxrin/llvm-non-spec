@@ -25,6 +25,9 @@ class RISCVRegisterBankInfo;
 class RISCVSubtarget;
 class RISCVTargetMachine;
 
+FunctionPass *createRISCVNSBranchOptPass();
+void initializeRISCVNSBranchOptPass(PassRegistry &);
+
 FunctionPass *createRISCVCodeGenPreparePass();
 void initializeRISCVCodeGenPreparePass(PassRegistry &);
 

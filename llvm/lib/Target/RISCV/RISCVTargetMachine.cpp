@@ -153,6 +153,9 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVExpandAtomicPseudoPass(*PR);
   initializeRISCVRedundantCopyEliminationPass(*PR);
   initializeRISCVAsmPrinterPass(*PR);
+
+  // Non Spec Passes
+  initializeRISCVNSBranchOptPass(*PR);
 }
 
 static StringRef computeDataLayout(const Triple &TT,
@@ -597,6 +600,10 @@ void RISCVPassConfig::addPreEmitPass2() {
   addPass(createUnpackMachineBundles([&](const MachineFunction &MF) {
     return MF.getFunction().getParent()->getModuleFlag("kcfi");
   }));
+
+
+  // Non Spec Passes
+  addPass(createRISCVNSBranchOptPass());
 }
 
 void RISCVPassConfig::addMachineSSAOptimization() {
