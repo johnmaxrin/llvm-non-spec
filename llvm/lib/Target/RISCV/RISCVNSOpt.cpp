@@ -58,17 +58,21 @@ private:
       switch (MI.getOpcode()) {
       case RISCV::BMOVS_J:
         ++Cbmovs;
+        MBB.splice(MBB.begin(), &MBB, MI);
         break;
 
       case RISCV::BMOVS_I:
+        MBB.splice(MBB.begin(), &MBB, MI);
         ++Cbmovs;
         break;
 
       case RISCV::BMOVT_J:
+        MBB.splice(MBB.begin(), &MBB, MI);
         ++Cbmovt;
         break;
 
       case RISCV::BMOVT_I:
+        MBB.splice(MBB.begin(), &MBB, MI);
         ++Cbmovt;
         break;
 
@@ -114,6 +118,7 @@ private:
       }
     }
 
+    // Ignore these for now, Just wanted to see  how things works ;>
     LLVM_DEBUG(dbgs() << "BMOVS Count: " << Cbmovs << "\n");
     LLVM_DEBUG(dbgs() << "BMOVT Count: " << Cbmovt << "\n");
     LLVM_DEBUG(dbgs() << "BMOVC Count: " << Cbmovc << "\n");
