@@ -11,11 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCVMachineFunctionInfo.h"
+#include "MCTargetDesc/RISCVMCTargetDesc.h"
 #include "RISCVNonSpec.h"
 
+#include "llvm/CodeGen/MachineBasicBlock.h"
+#include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Module.h"
 #include "llvm/MC/MCContext.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
 
@@ -152,45 +157,52 @@ bool RISCVMachineFunctionInfo::isSExt32Register(Register Reg) const {
 
 #define DEBUG_TYPE "ir"
 
-void RISCVMachineFunctionInfo::setBranch(MachineInstr* PB, MachineInstr* Source, MachineInstr* Target, MachineInstr* Condition) {
-  //assert(Source->getOperand(1).isMCSymbol());
+void RISCVMachineFunctionInfo::setBranch(MachineInstr *PB, MachineInstr *Source,
+                                         MachineInstr *Target,
+                                         MachineInstr *Condition) {
+  // assert(Source->getOperand(1).isMCSymbol());
   assert(Target->getOperand(1).isMBB());
-  assert((Condition == nullptr) || (Condition->getOperand(0).isReg() && Condition->getOperand(1).isReg()));
+  assert((Condition == nullptr) || (Condition->getOperand(0).isReg() &&
+                                    Condition->getOperand(1).isReg()));
   // BMOVSupportMap[BranchIndex] = BMOVSupport { Source, Target, Condition };
   PB->getOperand(1).setImm(1);
 }
-MCSymbol* RISCVMachineFunctionInfo::getBranchSource(MachineInstr* PB) const {
-  MachineBasicBlock *MBB = PB->getParent();
-  Register Reg = PB->getOperand(0).getReg();
-  for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
-    MachineInstr& MI = *It;
-    if (MI.getOpcode() != RISCV::BMOVS_J)
-      continue;
-    if (MI.getOperand(0).getReg() != Reg)
-      continue;
-    return getBranchSource(PB, &MI);
-  }
-  llvm_unreachable("[non-spec] :(");  //[TODO] Add some better error message. 
+MCSymbol *RISCVMachineFunctionInfo::getBranchSource(MachineInstr *PB) const {
+  MachineFunction *MF = PB->getParent()->getParent();
+
+  auto NsMap = MF->getInfo<RISCVMachineFunctionInfo>()->getNSBranchMap();
+  if(NsMap.empty())
+    llvm_unreachable("[NS MAP EMPTY!]");
+
+  MachineInstr *BMOVS = NsMap.lookup(PB);
+  if(!BMOVS)
+    llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message.
+  
+  return getBranchSource(PB, BMOVS);
 }
+
 void RISCVMachineFunctionInfo::fixBranchSource(MachineInstr *BMOVS) const {
-  MachineBasicBlock *MBB = BMOVS->getParent();
   Register Reg = BMOVS->getOperand(0).getReg();
-  for (auto It = BMOVS->getIterator(); It != MBB->end(); ++It) {
-    MachineInstr& MI = *It;
-    if (!RISCVNonSpec::isPB(MI.getOpcode()))
-      continue;
-    if (MI.getOperand(0).getReg() != Reg)
-      continue;
-    getBranchSource(&MI, BMOVS);
-    return;
+  MachineFunction *MF = BMOVS->getParent()->getParent();
+
+  // Search ALL blocks instead of just current block
+  for (MachineBasicBlock &MBB : *MF) {
+    for (MachineInstr &MI : MBB) {
+      if (!RISCVNonSpec::isPB(MI.getOpcode()))
+        continue;
+      if (MI.getOperand(0).getReg() != Reg)
+        continue;
+      getBranchSource(&MI, BMOVS);
+      return;
+    }
   }
-  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
+  llvm_unreachable("[non-spec] :(");
 }
 void RISCVMachineFunctionInfo::fixBranchTarget(MachineInstr *BMOVT) const {
   MachineBasicBlock *MBB = BMOVT->getParent();
   Register Reg = BMOVT->getOperand(0).getReg();
   for (auto It = BMOVT->getIterator(); It != MBB->end(); ++It) {
-    MachineInstr& MI = *It;
+    MachineInstr &MI = *It;
     if (!RISCVNonSpec::isPB(MI.getOpcode()))
       continue;
     if (MI.getOperand(0).getReg() != Reg)
@@ -201,59 +213,68 @@ void RISCVMachineFunctionInfo::fixBranchTarget(MachineInstr *BMOVT) const {
     BMOVT->getOperand(1).setMBB(TargetMBB);
     return;
   }
-  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
+  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message.
 }
-MCSymbol* RISCVMachineFunctionInfo::getBranchSource(MachineInstr *PB, MachineInstr *BMOVS) const {
-  MachineOperand& Operand = BMOVS->getOperand(1);
+MCSymbol *RISCVMachineFunctionInfo::getBranchSource(MachineInstr *PB,
+                                                    MachineInstr *BMOVS) const {
+  MachineOperand &Operand = BMOVS->getOperand(1);
   if (Operand.isMCSymbol()) {
     return BMOVS->getOperand(1).getMCSymbol();
   }
-  const char* SymbolName = Operand.getSymbolName();
+  const char *SymbolName = Operand.getSymbolName();
   BMOVS->removeOperand(1);
   MCContext &Context = BMOVS->getParent()->getParent()->getContext();
   MCSymbol *Sym = Context.createTempSymbol(SymbolName);
   BMOVS->addOperand(MachineOperand::CreateMCSymbol(Sym));
   return Sym;
 }
-MachineBasicBlock* RISCVMachineFunctionInfo::getBranchTarget(const MachineInstr* PB) {
+MachineBasicBlock *
+RISCVMachineFunctionInfo::getBranchTarget(const MachineInstr *PB) {
   return PB->getOperand(2).getMBB();
 }
-unsigned RISCVMachineFunctionInfo::getBranchOpcode(const MachineInstr *PB) const {
+unsigned
+RISCVMachineFunctionInfo::getBranchOpcode(const MachineInstr *PB) const {
   const MachineBasicBlock *MBB = PB->getParent();
   Register Reg = PB->getOperand(0).getReg();
   for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
-    const MachineInstr& MI = *It;
+    const MachineInstr &MI = *It;
     if (!RISCVNonSpec::isBMOVC(MI.getOpcode()))
       continue;
     if (MI.getOperand(0).getReg() != Reg)
       continue;
     return MI.getOpcode();
   }
-  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
+  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message.
 }
-RISCVCC::CondCode RISCVMachineFunctionInfo::getBranchCond(const MachineInstr* PB) const {
+RISCVCC::CondCode
+RISCVMachineFunctionInfo::getBranchCond(const MachineInstr *PB) const {
   return RISCVInstrInfo::getCondFromBranchOpc(getBranchOpcode(PB));
 }
-const MachineOperand& RISCVMachineFunctionInfo::getBranchReg(const MachineInstr* PB, int Index) const {
+const MachineOperand &
+RISCVMachineFunctionInfo::getBranchReg(const MachineInstr *PB,
+                                       int Index) const {
   const MachineBasicBlock *MBB = PB->getParent();
   Register Reg = PB->getOperand(0).getReg();
   for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
-    const MachineInstr& MI = *It;
+    const MachineInstr &MI = *It;
     if (!RISCVNonSpec::isBMOVC(MI.getOpcode()))
       continue;
     if (MI.getOperand(0).getReg() != Reg)
       continue;
     return MI.getOperand(1 + Index);
   }
-  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
+  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message.
 }
-unsigned RISCVMachineFunctionInfo::removeBranchComplete(MachineInstr* PB, int *BytesRemoved) {
+unsigned RISCVMachineFunctionInfo::removeBranchComplete(MachineInstr *PB,
+                                                        int *BytesRemoved) {
   BMOVSupport Support = getBMOVSupport(PB);
   PB->getOperand(1).setImm(0);
   unsigned NumberOfInstructionsRemoved = 0;
 
-  const RISCVInstrInfo *TII =
-    PB->getParent()->getParent()->getSubtarget<RISCVSubtarget>().getInstrInfo();
+  const RISCVInstrInfo *TII = PB->getParent()
+                                  ->getParent()
+                                  ->getSubtarget<RISCVSubtarget>()
+                                  .getInstrInfo();
 
   if (BytesRemoved)
     *BytesRemoved += TII->getInstSizeInBytes(*Support.source);
@@ -280,42 +301,43 @@ unsigned RISCVMachineFunctionInfo::removeBranchComplete(MachineInstr* PB, int *B
   return NumberOfInstructionsRemoved;
 }
 
-RISCVMachineFunctionInfo::BMOVSupport RISCVMachineFunctionInfo::getBMOVSupport(MachineInstr *PB) const {
+RISCVMachineFunctionInfo::BMOVSupport
+RISCVMachineFunctionInfo::getBMOVSupport(MachineInstr *PB) const {
   BMOVSupport Support = {};
   bool WantCondition = PB->getOpcode() == RISCV::PseudoPBC;
 
   MachineBasicBlock *MBB = PB->getParent();
   Register Reg = PB->getOperand(0).getReg();
   for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
-    MachineInstr& MI = *It;
+    MachineInstr &MI = *It;
     switch (MI.getOpcode()) {
-      case RISCV::BMOVS_J: {
-        if (MI.getOperand(0).getReg() != Reg)
-          continue;
-        Support.source = &MI;
-        break;
-      }
-      case RISCV::BMOVT_J: {
-          if (MI.getOperand(0).getReg() != Reg)
-            continue;
-          Support.target = &MI;
-          break;
-      }
-      case RISCV::BMOVC_BEQ:
-      case RISCV::BMOVC_BNE:
-      case RISCV::BMOVC_BLT:
-      case RISCV::BMOVC_BGE:
-      case RISCV::BMOVC_BLTU:
-      case RISCV::BMOVC_BGEU:
-      {
-          if (!WantCondition)
-            continue;
-          if (MI.getOperand(0).getReg() != Reg)
-            continue;
-          Support.condition = &MI;
-          break;
-      }
-      default: continue;
+    case RISCV::BMOVS_J: {
+      if (MI.getOperand(0).getReg() != Reg)
+        continue;
+      Support.source = &MI;
+      break;
+    }
+    case RISCV::BMOVT_J: {
+      if (MI.getOperand(0).getReg() != Reg)
+        continue;
+      Support.target = &MI;
+      break;
+    }
+    case RISCV::BMOVC_BEQ:
+    case RISCV::BMOVC_BNE:
+    case RISCV::BMOVC_BLT:
+    case RISCV::BMOVC_BGE:
+    case RISCV::BMOVC_BLTU:
+    case RISCV::BMOVC_BGEU: {
+      if (!WantCondition)
+        continue;
+      if (MI.getOperand(0).getReg() != Reg)
+        continue;
+      Support.condition = &MI;
+      break;
+    }
+    default:
+      continue;
     }
   }
   assert(Support.source != nullptr);

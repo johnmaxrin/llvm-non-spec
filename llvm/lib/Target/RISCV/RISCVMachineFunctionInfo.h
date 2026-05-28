@@ -17,6 +17,7 @@
 #include "llvm/CodeGen/MIRYamlMapping.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineInstr.h"
 
 namespace llvm {
 
@@ -29,6 +30,8 @@ struct RISCVMachineFunctionInfo final : public yaml::MachineFunctionInfo {
 
   RISCVMachineFunctionInfo() = default;
   RISCVMachineFunctionInfo(const llvm::RISCVMachineFunctionInfo &MFI);
+
+
 
   void mappingImpl(yaml::IO &YamlIO) override;
   ~RISCVMachineFunctionInfo() = default;
@@ -85,6 +88,9 @@ private:
 
   /// Does it probe the stack for a dynamic allocation?
   bool HasDynamicAllocation = false;
+
+  DenseMap<MachineInstr*, MachineInstr*> BMOVStoPB; // Map for hoisiting all bmovs above. 
+  // Use the same for BMOVT too. 
 
 public:
   RISCVMachineFunctionInfo(const Function &F, const RISCVSubtarget *STI);
@@ -240,6 +246,11 @@ public:
   const MachineOperand& getBranchReg(const MachineInstr* PB, int Index) const;
   unsigned removeBranchComplete(MachineInstr* PB, int *BytesRemoved = nullptr);
   BMOVSupport getBMOVSupport(MachineInstr *PB) const;
+
+  const DenseMap<MachineInstr *, MachineInstr *> &getNSBranchMap() const { return BMOVStoPB; }
+  void setNSBranchMap(DenseMap<MachineInstr *, MachineInstr *> &&Map) { BMOVStoPB = std::move(Map); }
+
+
 };
 
 } // end namespace llvm

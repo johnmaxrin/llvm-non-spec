@@ -4,16 +4,20 @@
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineOperand.h"
+#include "llvm/CodeGen/Register.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
+#include <algorithm>
 
 #include "MCTargetDesc/RISCVMCTargetDesc.h"
 #include "RISCV.h"
 #include "RISCVInstrInfo.h"
+#include "RISCVNonSpec.h"
 #include "RISCVSubtarget.h"
 #include "RISCVTargetMachine.h"
+#include "RISCVMachineFunctionInfo.h"
 
 using namespace llvm;
 
@@ -28,6 +32,32 @@ public:
   RISCVNSBranchOpt() : MachineFunctionPass(ID) {}
 
   bool runOnMachineFunction(MachineFunction &MF) override {
+
+
+    //  ----- Do the mapping first ------ 
+    DenseMap<MachineInstr*, MachineInstr *> NSMap;
+    for(MachineBasicBlock &MBB : MF)
+    {
+      for(MachineInstr &MI: MBB)
+      {
+        if(MI.getOpcode() != RISCV::BMOVS_J)
+          continue;
+
+        Register Reg = MI.getOperand(0).getReg();
+
+        for(auto It = MI.getIterator(); It != MBB.end(); ++It)
+        {
+          if(!RISCVNonSpec::isPB(It->getOpcode())) continue;
+          if(It->getOperand(0).getReg() != Reg) continue;
+          NSMap[&*It] = &MI;
+        }
+
+      }
+    }
+
+    MF.getInfo<RISCVMachineFunctionInfo>()->setNSBranchMap(std::move(NSMap));
+    // ----- End of mapping -----
+
     bool Changed = false;
     const TargetInstrInfo *TII = MF.getSubtarget().getInstrInfo();
     const TargetRegisterInfo *TRI = MF.getSubtarget().getRegisterInfo();
@@ -35,7 +65,7 @@ public:
     // Get insertion point for bmovs_j and bmovt_j
     MachineBasicBlock &EntryBlk  = MF.front();
 
-    LLVM_DEBUG(dbgs() << "RISCV Non Speculative Branch Optimization\n");
+    // LLVM_DEBUG(dbgs() << "RISCV Non Speculative Branch Optimization\n");
 
     for (MachineBasicBlock &MBB : MF) {
       Changed |= optimizeBlock(MBB, TII, EntryBlk);
@@ -50,7 +80,7 @@ public:
 
 private:
   bool optimizeBlock(MachineBasicBlock &MBB, const TargetInstrInfo *TII, MachineBasicBlock  &EntryBlk) {
-    bool Changed = false;
+    bool Changed = true;
     int Cbmovs = 0;
     int Cbmovt = 0;
     int Cbmovc = 0;
