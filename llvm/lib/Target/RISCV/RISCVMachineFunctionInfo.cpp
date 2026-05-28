@@ -170,7 +170,7 @@ MCSymbol* RISCVMachineFunctionInfo::getBranchSource(MachineInstr* PB) const {
       continue;
     return getBranchSource(PB, &MI);
   }
-  llvm_unreachable("[non-spec] :(");
+  llvm_unreachable("[non-spec] :(");  //[TODO] Add some better error message. 
 }
 void RISCVMachineFunctionInfo::fixBranchSource(MachineInstr *BMOVS) const {
   MachineBasicBlock *MBB = BMOVS->getParent();
@@ -184,7 +184,7 @@ void RISCVMachineFunctionInfo::fixBranchSource(MachineInstr *BMOVS) const {
     getBranchSource(&MI, BMOVS);
     return;
   }
-  llvm_unreachable("[non-spec] :(");
+  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
 }
 void RISCVMachineFunctionInfo::fixBranchTarget(MachineInstr *BMOVT) const {
   MachineBasicBlock *MBB = BMOVT->getParent();
@@ -201,7 +201,7 @@ void RISCVMachineFunctionInfo::fixBranchTarget(MachineInstr *BMOVT) const {
     BMOVT->getOperand(1).setMBB(TargetMBB);
     return;
   }
-  llvm_unreachable("[non-spec] :(");
+  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
 }
 MCSymbol* RISCVMachineFunctionInfo::getBranchSource(MachineInstr *PB, MachineInstr *BMOVS) const {
   MachineOperand& Operand = BMOVS->getOperand(1);
@@ -229,7 +229,7 @@ unsigned RISCVMachineFunctionInfo::getBranchOpcode(const MachineInstr *PB) const
       continue;
     return MI.getOpcode();
   }
-  llvm_unreachable("[non-spec] :(");
+  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
 }
 RISCVCC::CondCode RISCVMachineFunctionInfo::getBranchCond(const MachineInstr* PB) const {
   return RISCVInstrInfo::getCondFromBranchOpc(getBranchOpcode(PB));
@@ -245,7 +245,7 @@ const MachineOperand& RISCVMachineFunctionInfo::getBranchReg(const MachineInstr*
       continue;
     return MI.getOperand(1 + Index);
   }
-  llvm_unreachable("[non-spec] :(");
+  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message. 
 }
 unsigned RISCVMachineFunctionInfo::removeBranchComplete(MachineInstr* PB, int *BytesRemoved) {
   BMOVSupport Support = getBMOVSupport(PB);
