@@ -90,6 +90,8 @@ private:
   bool HasDynamicAllocation = false;
 
   DenseMap<MachineInstr*, MachineInstr*> BMOVStoPB; // Map for hoisiting all bmovs above. 
+  DenseMap<MachineInstr*, MachineInstr*> BMOVTtoPB; // Map for hoisiting all bmovs above. 
+
   // Use the same for BMOVT too. 
 
 public:
@@ -247,8 +249,11 @@ public:
   unsigned removeBranchComplete(MachineInstr* PB, int *BytesRemoved = nullptr);
   BMOVSupport getBMOVSupport(MachineInstr *PB) const;
 
-  const DenseMap<MachineInstr *, MachineInstr *> &getNSBranchMap() const { return BMOVStoPB; }
-  void setNSBranchMap(DenseMap<MachineInstr *, MachineInstr *> &&Map) { BMOVStoPB = std::move(Map); }
+  const DenseMap<MachineInstr *, MachineInstr *> &getBMOVSMap() const { return BMOVStoPB; }
+  const DenseMap<MachineInstr *, MachineInstr *> &getBMOVTMap() const { return BMOVTtoPB; }
+
+  void setBMOVSMap(DenseMap<MachineInstr *, MachineInstr *> &&Map) { BMOVStoPB = std::move(Map); }
+  void setBMOVTMap(DenseMap<MachineInstr *, MachineInstr *> &&Map) { BMOVTtoPB = std::move(Map); }
 
 
 };

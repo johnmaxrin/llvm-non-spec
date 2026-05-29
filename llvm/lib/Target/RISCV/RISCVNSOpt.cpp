@@ -35,12 +35,13 @@ public:
 
 
     //  ----- Do the mapping first ------ 
-    DenseMap<MachineInstr*, MachineInstr *> NSMap;
+    DenseMap<MachineInstr*, MachineInstr *> BMOVSMap;
+    DenseMap<MachineInstr*, MachineInstr *> BMOVTMap;
     for(MachineBasicBlock &MBB : MF)
     {
       for(MachineInstr &MI: MBB)
       {
-        if(MI.getOpcode() != RISCV::BMOVS_J)
+        if(MI.getOpcode() != RISCV::BMOVS_J && MI.getOpcode() != RISCV::BMOVT_J)
           continue;
 
         Register Reg = MI.getOperand(0).getReg();
@@ -49,13 +50,18 @@ public:
         {
           if(!RISCVNonSpec::isPB(It->getOpcode())) continue;
           if(It->getOperand(0).getReg() != Reg) continue;
-          NSMap[&*It] = &MI;
+
+          if(MI.getOpcode() == RISCV::BMOVS_J)
+            BMOVSMap[&*It] = &MI;
+          else
+            BMOVTMap[&MI] = &*It;  // [Change Later] For the time being do this. Change this later.
         }
 
       }
     }
 
-    MF.getInfo<RISCVMachineFunctionInfo>()->setNSBranchMap(std::move(NSMap));
+    MF.getInfo<RISCVMachineFunctionInfo>()->setBMOVSMap(std::move(BMOVSMap));
+    MF.getInfo<RISCVMachineFunctionInfo>()->setBMOVTMap(std::move(BMOVTMap));
     // ----- End of mapping -----
 
     bool Changed = false;
@@ -111,6 +117,7 @@ private:
 
       case RISCV::BMOVT_J:
         // You can hoist this to the beginning if the function. 
+        EntryBlk.splice(InsertionPt, &MBB, MI);
         
         // EntryBlk.splice(InsertionPt, &MBB, MI);
         ++Cbmovt;

@@ -170,11 +170,11 @@ void RISCVMachineFunctionInfo::setBranch(MachineInstr *PB, MachineInstr *Source,
 MCSymbol *RISCVMachineFunctionInfo::getBranchSource(MachineInstr *PB) const {
   MachineFunction *MF = PB->getParent()->getParent();
 
-  auto NsMap = MF->getInfo<RISCVMachineFunctionInfo>()->getNSBranchMap();
-  if(NsMap.empty())
+  auto BMOVSMap = MF->getInfo<RISCVMachineFunctionInfo>()->getBMOVSMap();
+  if(BMOVSMap.empty())
     llvm_unreachable("[NS MAP EMPTY!]");
 
-  MachineInstr *BMOVS = NsMap.lookup(PB);
+  MachineInstr *BMOVS = BMOVSMap.lookup(PB);
   if(!BMOVS)
     llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message.
   
@@ -199,22 +199,27 @@ void RISCVMachineFunctionInfo::fixBranchSource(MachineInstr *BMOVS) const {
   llvm_unreachable("[non-spec] :(");
 }
 void RISCVMachineFunctionInfo::fixBranchTarget(MachineInstr *BMOVT) const {
-  MachineBasicBlock *MBB = BMOVT->getParent();
-  Register Reg = BMOVT->getOperand(0).getReg();
-  for (auto It = BMOVT->getIterator(); It != MBB->end(); ++It) {
-    MachineInstr &MI = *It;
-    if (!RISCVNonSpec::isPB(MI.getOpcode()))
-      continue;
-    if (MI.getOperand(0).getReg() != Reg)
-      continue;
 
-    assert(RISCVNonSpec::isPB(MI.getOpcode()));
-    MachineBasicBlock *TargetMBB = MI.getOperand(2).getMBB();
-    BMOVT->getOperand(1).setMBB(TargetMBB);
-    return;
-  }
-  llvm_unreachable("[non-spec] :("); //[TODO] Add some better error message.
+  MachineFunction *MF = BMOVT->getParent()->getParent();
+  auto BMOVTMap = MF->getInfo<RISCVMachineFunctionInfo>()->getBMOVTMap();
+  
+  if(BMOVTMap.empty())
+    llvm_unreachable("[NS MAP EMPTY!]");
+
+  MachineInstr *PB = BMOVTMap.lookup(BMOVT);
+  assert(RISCVNonSpec::isPB(PB->getOpcode()));
+
+  Register Reg = BMOVT->getOperand(0).getReg();
+  if (PB->getOperand(0).getReg() != Reg)
+      llvm_unreachable("[non-spec] :( Reg values don't match.");
+
+  MachineBasicBlock *TargetMBB = PB->getOperand(2).getMBB();
+  BMOVT->getOperand(1).setMBB(TargetMBB);
+  return;
+  
+  llvm_unreachable("[non-spec] :( HEre "); //[TODO] Add some better error message.
 }
+
 MCSymbol *RISCVMachineFunctionInfo::getBranchSource(MachineInstr *PB,
                                                     MachineInstr *BMOVS) const {
   MachineOperand &Operand = BMOVS->getOperand(1);
