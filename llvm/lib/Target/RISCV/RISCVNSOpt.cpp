@@ -7,6 +7,7 @@
 #include "llvm/CodeGen/Register.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/MC/MCRegister.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
@@ -35,8 +36,11 @@ public:
 
 
     //  ----- Do the mapping first ------ 
+    // ---- Let's create a proper structure ---- 
+
     DenseMap<MachineInstr*, MachineInstr *> BMOVSMap;
     DenseMap<MachineInstr*, MachineInstr *> BMOVTMap;
+    SmallSet<MCRegister, 32> UsedBRs; 
     for(MachineBasicBlock &MBB : MF)
     {
       for(MachineInstr &MI: MBB)
@@ -74,8 +78,13 @@ public:
     // LLVM_DEBUG(dbgs() << "RISCV Non Speculative Branch Optimization\n");
 
     for (MachineBasicBlock &MBB : MF) {
-      Changed |= optimizeBlock(MBB, TII, EntryBlk);
+      Changed |= optimizeBlock(MBB, TII, EntryBlk, UsedBRs);
     }
+
+    
+
+
+    // --- End of register allocation -----
 
     return Changed;
   }
@@ -85,7 +94,7 @@ public:
   }
 
 private:
-  bool optimizeBlock(MachineBasicBlock &MBB, const TargetInstrInfo *TII, MachineBasicBlock  &EntryBlk) {
+  bool optimizeBlock(MachineBasicBlock &MBB, const TargetInstrInfo *TII, MachineBasicBlock  &EntryBlk, SmallSet<MCRegister, 32> &UsedBRs) {
     bool Changed = true;
     int Cbmovs = 0;
     int Cbmovt = 0;
@@ -93,7 +102,11 @@ private:
     int Cpb = 0;
 
 
-    MachineBasicBlock::iterator InsertionPt = EntryBlk.begin();
+    //MachineBasicBlock::iterator InsertionPt = EntryBlk.getFirstTerminator();
+    MachineBasicBlock::iterator InsertionPt = EntryBlk.getFirstNonPHI();
+    MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
+
+    MachineFunction *MF = EntryBlk.getParent();
 
     for (auto I = MBB.begin(), E = MBB.end(); I != E;) {
       MachineInstr &MI = *I++;
@@ -102,17 +115,57 @@ private:
       //     { dbgs() << "Opcode: " << TII->getName(MI.getOpcode()) << "\n"; });
 
       switch (MI.getOpcode()) {
-      case RISCV::BMOVS_J:
-        // You can hoist this to the beginning if the function. 
+     case RISCV::BMOVS_J:
+        {
+          ++Cbmovs;
 
-        ++Cbmovs;
-        EntryBlk.splice(InsertionPt, &MBB, MI);
-        break;
+          if (MI.getOperand(0).isReg() && MI.getOperand(0).isDef()) {
+            MCRegister OldReg = MI.getOperand(0).getReg().asMCReg();
 
+            if (UsedBRs.count(OldReg)) {
+              // Already claimed by a previously hoisted pair -> need a fresh reg
+              LLVM_DEBUG(dbgs() << "New Reg: \n";);
+              MCRegister NewReg;
+              bool Found = false;
+              for (MCPhysReg Candidate : RISCV::PBRRegClass) {
+                if (!UsedBRs.count(Candidate)) {
+                  NewReg = Candidate;
+                  Found = true;
+                  break;
+                }
+              }
+
+              if (!Found) {
+                LLVM_DEBUG(dbgs() << "BR pool exhausted, skipping: "; MI.dump());
+              } else {
+                UsedBRs.insert(NewReg);
+                MI.getOperand(0).setReg(NewReg);
+
+                LLVM_DEBUG(dbgs() << "Updating: "; MI.dump());
+                // Create the MAP and only update the operand of those pairs. 
+
+                for (MachineBasicBlock &SearchMBB : *MF)
+                  for (MachineInstr &SearchMI : SearchMBB)
+                    for (MachineOperand &MO : SearchMI.operands())
+                      if (MO.isReg() && MO.getReg() == OldReg && &SearchMI != &MI)
+                        MO.setReg(NewReg);
+              }
+            } else {
+              // First time this register is being hoisted - keep it as-is
+              UsedBRs.insert(OldReg);
+            }
+          }
+
+          EntryBlk.splice(InsertionPt, &MBB, MI);
+          Changed = true;
+        }
+        break; 
+      
       case RISCV::BMOVS_I:
         // Do dependecne analysis and hoist it as far as we can.
 
         ++Cbmovs;
+      
         break;
 
       case RISCV::BMOVT_J:
