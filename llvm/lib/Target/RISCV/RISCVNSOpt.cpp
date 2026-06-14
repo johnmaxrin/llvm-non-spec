@@ -143,8 +143,8 @@ private:
 
                 LLVM_DEBUG(dbgs() << "Updating: "; MI.dump());
                 // Create the MAP and only update the operand of those pairs. 
-
                 for (MachineBasicBlock &SearchMBB : *MF)
+
                   for (MachineInstr &SearchMI : SearchMBB)
                     for (MachineOperand &MO : SearchMI.operands())
                       if (MO.isReg() && MO.getReg() == OldReg && &SearchMI != &MI)
