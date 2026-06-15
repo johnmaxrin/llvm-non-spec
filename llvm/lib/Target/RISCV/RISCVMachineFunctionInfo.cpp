@@ -179,6 +179,9 @@ MCSymbol* RISCVMachineFunctionInfo::getBranchSource(MachineInstr* PB) const {
   llvm_unreachable("[non-spec] :(");
 }
 void RISCVMachineFunctionInfo::fixBranchSource(MachineInstr *BMOVS) const {
+  if (BMOVS->getOperand(1).isImm()) {
+    return; // probably ok right?
+  }
   MachineBasicBlock *MBB = BMOVS->getParent();
   Register Reg = BMOVS->getOperand(0).getReg();
   for (auto It = BMOVS->getIterator(); It != MBB->end(); ++It) {
@@ -213,6 +216,9 @@ MCSymbol* RISCVMachineFunctionInfo::getBranchSource(MachineInstr *PB, MachineIns
   MachineOperand& Operand = BMOVS->getOperand(1);
   if (Operand.isMCSymbol()) {
     return BMOVS->getOperand(1).getMCSymbol();
+  }
+  if (Operand.isImm()) {
+    return nullptr;
   }
   const char* SymbolName = Operand.getSymbolName();
   BMOVS->removeOperand(1);

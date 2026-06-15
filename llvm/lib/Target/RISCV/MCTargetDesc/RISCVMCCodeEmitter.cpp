@@ -208,13 +208,13 @@ void RISCVMCCodeEmitter::expandFunctionCall(const MCInst &MI,
   if (MI.getOpcode() == RISCV::PseudoTAIL ||
       MI.getOpcode() == RISCV::PseudoJump) {
     // Emit PBAL (JALR X0, Ra, 0)
-    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0);
+    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0).addExpr(CallExpr);
     Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
     support::endian::write(CB, Binary, llvm::endianness::little);
   }
   else {
     // Emit PBAL (JALR Ra, Ra, 0)
-    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0);
+    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0).addExpr(CallExpr);
     Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
     support::endian::write(CB, Binary, llvm::endianness::little);
   }
@@ -499,20 +499,23 @@ void RISCVMCCodeEmitter::encodeInstruction(const MCInst &MI,
   case RISCV::PseudoBRIND:
   case RISCV::PseudoBRINDX7:
   case RISCV::PseudoBRINDNonX7:
+    // llvm_unreachable("[Non-Spec] No longer expand this pseudo instruction here");
     expandIndirect(MI, CB, Fixups, STI, RISCV::X0);
     MCNumEmitted += 3; // bmovs, bmovt, pbal
     return;
   case RISCV::PseudoCALLIndirect:
   case RISCV::PseudoCALLIndirectX7:
   case RISCV::PseudoCALLIndirectNonX7:
+    // llvm_unreachable("[Non-Spec] No longer expand this pseudo instruction here");
     expandIndirect(MI, CB, Fixups, STI, RISCV::X1);
-    MCNumEmitted += 3; // bmovs, bmovt, pbal
+    MCNumEmitted += 4; // auipc, bmovs, bmovt, pbal
     return;
   case RISCV::PseudoTAILIndirect:
   case RISCV::PseudoTAILIndirectX7:
   case RISCV::PseudoTAILIndirectNonX7:
+    // llvm_unreachable("[Non-Spec] No longer expand this pseudo instruction here");
     expandIndirect(MI, CB, Fixups, STI, RISCV::X0);
-    MCNumEmitted += 3;
+    MCNumEmitted += 3; // bmovs, bmovt, pb
     return;
   case RISCV::PseudoAddTPRel:
     expandAddTPRel(MI, CB, Fixups, STI);

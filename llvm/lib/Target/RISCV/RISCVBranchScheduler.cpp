@@ -35,8 +35,24 @@ public:
 
 char RISCVBranchScheduler::ID = 0;
 
+struct Branch {
+  MachineInstr *BMOVS;
+  MachineInstr *BMOVT;
+  MachineInstr *BMOVC;
+  MachineInstr *PB;
+
+  explicit Branch(MachineInstr *BS, MachineInstr *BT, MachineInstr *PB)
+  : BMOVS(BS), BMOVT(BT), PB(PB) {}
+
+  Branch parseFromPB(MachineInstr* PB) {
+
+  }
+};
+
 bool RISCVBranchScheduler::runOnMachineFunction(MachineFunction &MF) {
   int Count = 0;
+
+  MF.dump();
 
   // - Keep track of how many branch registers we need
   // - > Register spilling requires extra bmov's
@@ -56,11 +72,11 @@ bool RISCVBranchScheduler::runOnMachineFunction(MachineFunction &MF) {
       ++I; // Increment the iterator BEFORE moving the instruction
 
       if (MI.isBMOV()) {
-        MI.removeFromParent();
-        MBB.insert(MBB.getFirstNonPHI(), &MI);
+        // MI.removeFromParent();
+        // MBB.insert(MBB.getFirstNonPHI(), &MI);
         Count += 1;
-        dbgs() << "Moved ";
-        MI.dump();
+        // dbgs() << "Moved ";
+        // MI.dump();
       }
     }
   }
