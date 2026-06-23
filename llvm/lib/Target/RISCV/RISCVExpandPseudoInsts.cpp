@@ -377,17 +377,17 @@ bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
   if (MBBI->getOpcode() == RISCV::PseudoTAIL ||
       MBBI->getOpcode() == RISCV::PseudoJump) {
     // Emit PBAL (JALR X0, Ra, 0)
-    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PBAL))
-        .addReg(RISCV::X0)
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBU))
         .addReg(BReg)
-        .addReg(RISCV::X0);
+        .addImm(-1); // This is where branch index will be assigned
+    MI->addOperand(*Func);
   }
   else {
     // Emit PBAL (JALR Ra, Ra, 0)
-    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PBAL))
-        .addReg(Ra)
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBI))
         .addReg(BReg)
-        .addReg(RISCV::X0);
+        .addImm(-1)
+        .addReg(Ra);
   }
 
   MBBI->eraseFromParent();

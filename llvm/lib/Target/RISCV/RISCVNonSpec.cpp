@@ -179,6 +179,7 @@ bool RISCVNonSpec::isPB(unsigned opcode) {
   case RISCV::PBAL:
   case RISCV::PseudoPBC:
   case RISCV::PseudoPBU:
+  case RISCV::PseudoPBI:
     return true;
   default:
     return false;

@@ -1792,6 +1792,7 @@ def PseudoLongBGEU : LongBccPseudo;
 /*
     PB   Unconditional -> PBU
     PB   Conditional   -> PBC
+    PB   Indirect      -> PBI
 */
 
 let isBarrier = 0, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
@@ -1801,6 +1802,10 @@ def PseudoPBC : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, simm21_lsb0_jal:$imm
 let isBarrier = 1, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
 def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, simm21_lsb0_jal:$imm20), []>,
                 PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
+
+let isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
+def PseudoPBI : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, GPRJALR:$dst), []>,
+                PseudoInstExpansion<(PBAL GPR:$dst, PBR:$rs1, X0)>;
 
 let isCall = 1, Defs = [X1], isCodeGenOnly = 0, Size = 16 in
 def PseudoCALL : Pseudo<(outs), (ins call_symbol:$func), [],
