@@ -16,8 +16,6 @@
 
 using namespace llvm;
 
-bool RISCVNS::UseVirtualRegisters = true;
-
 // TODO: use `getCondFromBranchOpc`
 
 static const char* labelFromCC(RISCVCC::CondCode CC) {
@@ -207,6 +205,9 @@ void RISCVNS::insertUnconditionalBranch(MachineBasicBlock& MBB,
   MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
     MBB, MI->getIterator(), &RegisterNo, false);
 
+  const bool UseVirtualRegisters = !MF->getProperties()
+    .hasProperty(MachineFunctionProperties::Property::NoVRegs);
+
   const Register BR = (UseVirtualRegisters ?
     MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :
     Register(RISCV::B0 + RegisterNo));
@@ -248,6 +249,9 @@ void RISCVNS::insertUnconditionalBranch(MachineBasicBlock& MBB,
   int RegisterNo = 0;
   MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
   MBB, MBB.getLastNonDebugInstr(), &RegisterNo, true);
+
+  const bool UseVirtualRegisters = !MF->getProperties()
+    .hasProperty(MachineFunctionProperties::Property::NoVRegs);
 
   const Register BR = (UseVirtualRegisters ?
     MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :
@@ -291,6 +295,9 @@ void RISCVNS::insertConditionalBranch(MachineBasicBlock& MBB,
   int RegisterNo = 0;
   MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
   MBB, MI->getIterator(), &RegisterNo, false);
+
+  const bool UseVirtualRegisters = !MF->getProperties()
+    .hasProperty(MachineFunctionProperties::Property::NoVRegs);
 
   const Register BR = (UseVirtualRegisters ?
     MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :
@@ -338,6 +345,9 @@ void RISCVNS::insertConditionalBranch(MachineBasicBlock& MBB,
   int RegisterNo = 0;
   MachineBasicBlock::iterator SupportIt = getBMOVSupportInsertLoc(
   MBB, MBB.getLastNonDebugInstr(), &RegisterNo, true);
+
+  const bool UseVirtualRegisters = !MF->getProperties()
+    .hasProperty(MachineFunctionProperties::Property::NoVRegs);
 
   const Register BR = (UseVirtualRegisters ?
     MF->getRegInfo().createVirtualRegister(&RISCV::PBRRegClass) :

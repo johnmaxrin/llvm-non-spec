@@ -20,13 +20,6 @@
 namespace llvm {
   class RISCVNS {
   public:
-    static bool UseVirtualRegisters; // TODO: This is a hack, find better solution
-    /*
-    if (MF.getProperties().hasProperty(MachineFunctionProperties::Property::NoVRegs)) {
-        // TODO: test this ^
-    }
-    */
-  public:
     static bool isBMOVC(unsigned opcode);
     static bool isPB(unsigned opcode);
   public:

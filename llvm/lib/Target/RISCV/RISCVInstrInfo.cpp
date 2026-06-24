@@ -1272,8 +1272,6 @@ unsigned RISCVInstrInfo::insertBranch(
   if (BytesAdded)
     *BytesAdded = 0;
 
-  RISCVNS::UseVirtualRegisters = false;
-
   // Shouldn't be a fall through.
   assert(TBB && "insertBranch must not be told to insert a fallthrough");
   assert((Cond.size() == 3 || Cond.size() == 0) &&
