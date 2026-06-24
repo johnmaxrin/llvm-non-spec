@@ -218,28 +218,6 @@ public:
 
   bool hasDynamicAllocation() const { return HasDynamicAllocation; }
   void setDynamicAllocation() { HasDynamicAllocation = true; }
-
-  //===----------------------------------------------------------------------===//
-  // Non-Spec Extensions
-  //===----------------------------------------------------------------------===//
-
-  struct BMOVSupport {
-    MachineInstr* source;
-    MachineInstr* target;
-    MachineInstr* condition; // can be nullptr
-  };
-
-  void setBranch(MachineInstr* PB, MachineInstr* Source, MachineInstr* Target, MachineInstr* Condition = nullptr);
-  static MachineBasicBlock* getBranchTarget(const MachineInstr* PB);
-  void fixBranchSource(MachineInstr *BMOVS) const;
-  void fixBranchTarget(MachineInstr *BMOVT) const;
-  unsigned getBranchOpcode(const MachineInstr *PB) const;
-  MCSymbol* getBranchSource(MachineInstr* PB) const;
-  MCSymbol* getBranchSource(MachineInstr *PB, MachineInstr *BMOVS) const;
-  RISCVCC::CondCode getBranchCond(const MachineInstr* PB) const;
-  const MachineOperand& getBranchReg(const MachineInstr* PB, int Index) const;
-  unsigned removeBranchComplete(MachineInstr* PB, int *BytesRemoved = nullptr);
-  BMOVSupport getBMOVSupport(MachineInstr *PB) const;
 };
 
 } // end namespace llvm

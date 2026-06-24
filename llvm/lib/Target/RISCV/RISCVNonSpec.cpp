@@ -16,7 +16,7 @@
 
 using namespace llvm;
 
-bool RISCVNonSpec::UseVirtualRegisters = true;
+bool RISCVNS::UseVirtualRegisters = true;
 
 // TODO: use `getCondFromBranchOpc`
 
@@ -160,7 +160,7 @@ MachineBasicBlock::iterator getBMOVSupportInsertLoc(MachineBasicBlock& MBB, Mach
   return InsertIt;
 }
 
-bool RISCVNonSpec::isBMOVC(unsigned opcode) {
+bool RISCVNS::isBMOVC(unsigned opcode) {
   switch (opcode) {
   case RISCV::BMOVC_BEQ:
   case RISCV::BMOVC_BNE:
@@ -174,7 +174,7 @@ bool RISCVNonSpec::isBMOVC(unsigned opcode) {
   }
 }
 
-bool RISCVNonSpec::isPB(unsigned opcode) {
+bool RISCVNS::isPB(unsigned opcode) {
   switch (opcode) {
   case RISCV::PBAL:
   case RISCV::PseudoPBC:
@@ -186,7 +186,16 @@ bool RISCVNonSpec::isPB(unsigned opcode) {
   }
 }
 
-void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
+static inline Register getPBBranchRegister(const MachineInstr* MI) {
+  if (MI->getOpcode() == RISCV::PBAL) {
+    // PBAL has branch register as second operand
+    return MI->getOperand(1).getReg();
+  }
+  // All PseudoPBs will have branch register as first operand
+  return MI->getOperand(0).getReg();
+}
+
+void RISCVNS::insertUnconditionalBranch(MachineBasicBlock& MBB,
                                              MachineInstr* MI,
                                              MachineBasicBlock* TargetBB,
                                              const char *SymbolName) {
@@ -218,19 +227,17 @@ void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
   MachineInstr *pb =
     BuildMI(MBB, MI, DL, TII->get(RISCV::PseudoPBU))
       .addUse(BR)
-      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
-  // NOTE(non-spec): ^^ we include the target location here so
-  //                 that compiler passes will see this as a normal jump
+  // NOTE(mitch): ^^ we include the target location here so
+  //              that compiler passes will see this as a normal jump
 
+  (void)sizeof(source, target);
   LLVM_DEBUG(dbgs() << __func__ << ": " << *pb);
 
-  RISCVMachineFunctionInfo *MFI = MF->getInfo<RISCVMachineFunctionInfo>();
-  MFI->setBranch(pb, source, target);
   MI->eraseFromParent();
 }
 
-void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
+void RISCVNS::insertUnconditionalBranch(MachineBasicBlock& MBB,
                                              DebugLoc DL,
                                              MachineBasicBlock* TargetBB,
                                              const char *SymbolName,
@@ -263,20 +270,16 @@ void RISCVNonSpec::insertUnconditionalBranch(MachineBasicBlock& MBB,
   // pb b0
   MachineInstr *pb = BuildMI(&MBB, DL, TII->get(RISCV::PseudoPBU))
       .addUse(BR)
-      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
+  // NOTE(mitch): ^^ we include the target location here so
+  //              that compiler passes will see this as a normal jump
   if (BytesAdded)
     *BytesAdded += TII->getInstSizeInBytes(*pb);
-  // NOTE(non-spec): ^^ we include the target location here so
-  //                 that compiler passes will see this as a normal jump
 
   LLVM_DEBUG(dbgs() << __func__ << ": " << *pb);
-
-  RISCVMachineFunctionInfo *MFI = MF->getInfo<RISCVMachineFunctionInfo>();
-  MFI->setBranch(pb, source, target);
 }
 
-void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
+void RISCVNS::insertConditionalBranch(MachineBasicBlock& MBB,
                                            MachineInstr* MI,
                                            Register rs1,
                                            Register rs2,
@@ -312,19 +315,17 @@ void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
   // pb b0
   MachineInstr *pb = BuildMI(MBB, MI, DL, TII->get(RISCV::PseudoPBC))
       .addUse(BR)
-      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
   // NOTE(non-spec): ^^ we include the target location here so
   //                 that compiler passes will see this as a normal jump
 
+  (void)sizeof(source, target, condition);
   LLVM_DEBUG(dbgs() << __func__ << ": " << *pb);
 
-  RISCVMachineFunctionInfo *MFI = MF->getInfo<RISCVMachineFunctionInfo>();
-  MFI->setBranch(pb, source, target, condition);
   MI->eraseFromParent();
 }
 
-void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
+void RISCVNS::insertConditionalBranch(MachineBasicBlock& MBB,
                                            DebugLoc DL,
                                            RISCVCC::CondCode CC,
                                            Register rs1,
@@ -367,7 +368,6 @@ void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
   // pb b0
   MachineInstr *pb = BuildMI(&MBB, DL, TII->get(RISCV::PseudoPBC))
       .addUse(BR)
-      .addImm(-1) // This is where branch index will be assigned
       .addMBB(TargetBB);
   // NOTE(non-spec): ^^ we include the target location here so
   //                 that compiler passes will see this as a normal jump
@@ -375,7 +375,147 @@ void RISCVNonSpec::insertConditionalBranch(MachineBasicBlock& MBB,
     *BytesAdded += TII->getInstSizeInBytes(*pb);
 
   LLVM_DEBUG(dbgs() << __func__ << ": " << *pb);
+}
 
-  RISCVMachineFunctionInfo *MFI = MF->getInfo<RISCVMachineFunctionInfo>();
-  MFI->setBranch(pb, source, target, condition);
+
+RISCVNS::BMOVSupport RISCVNS::getBMOVSupport(MachineInstr *PB) {
+  BMOVSupport Support = {};
+  bool WantCondition = PB->getOpcode() == RISCV::PseudoPBC;
+
+  MachineBasicBlock *MBB = PB->getParent();
+  Register Reg = getPBBranchRegister(PB);
+  for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
+    MachineInstr& MI = *It;
+    switch (MI.getOpcode()) {
+      case RISCV::BMOVS_J: {
+        if (MI.getOperand(0).getReg() != Reg)
+          continue;
+        Support.source = &MI;
+        break;
+      }
+      case RISCV::BMOVT_J: {
+          if (MI.getOperand(0).getReg() != Reg)
+            continue;
+          Support.target = &MI;
+          Support.targetbb = MI.getOperand(1).getMBB();
+          break;
+      }
+      case RISCV::BMOVC_BEQ:
+      case RISCV::BMOVC_BNE:
+      case RISCV::BMOVC_BLT:
+      case RISCV::BMOVC_BGE:
+      case RISCV::BMOVC_BLTU:
+      case RISCV::BMOVC_BGEU:
+      {
+          if (!WantCondition)
+            continue;
+          if (MI.getOperand(0).getReg() != Reg)
+            continue;
+          Support.condition = &MI;
+          break;
+      }
+      default: continue;
+    }
+  }
+  assert(Support.source != nullptr);
+  assert(Support.target != nullptr);
+  assert(!WantCondition || Support.condition != nullptr);
+  return Support;
+}
+
+unsigned RISCVNS::removeBranchComplete(MachineInstr* PB, int *BytesRemoved) {
+  BMOVSupport Support = getBMOVSupport(PB);
+  unsigned NumberOfInstructionsRemoved = 0;
+
+  const RISCVInstrInfo *TII =
+    PB->getParent()->getParent()->getSubtarget<RISCVSubtarget>().getInstrInfo();
+
+  if (BytesRemoved)
+    *BytesRemoved += TII->getInstSizeInBytes(*Support.source);
+  // dbgs() << ">Removing " << *Support.source;
+  Support.source->eraseFromParent();
+  NumberOfInstructionsRemoved += 1;
+  if (BytesRemoved)
+    *BytesRemoved += TII->getInstSizeInBytes(*Support.target);
+  // dbgs() << ">Removing " << *Support.target;
+  Support.target->eraseFromParent();
+  NumberOfInstructionsRemoved += 1;
+  if (Support.condition) {
+    if (BytesRemoved)
+      *BytesRemoved += TII->getInstSizeInBytes(*Support.condition);
+    // dbgs() << ">Removing " << *Support.condition;
+    Support.condition->eraseFromParent();
+    NumberOfInstructionsRemoved += 1;
+  }
+  if (BytesRemoved)
+    *BytesRemoved += TII->getInstSizeInBytes(*PB);
+  // dbgs() << ">Removing " << *PB;
+  PB->eraseFromParent();
+  NumberOfInstructionsRemoved += 1;
+  return NumberOfInstructionsRemoved;
+}
+
+MCSymbol* getBranchSourceHelper(MachineInstr *BMOVS) {
+  MachineOperand& Operand = BMOVS->getOperand(1);
+  if (Operand.isMCSymbol()) {
+    return BMOVS->getOperand(1).getMCSymbol();
+  }
+  if (Operand.isImm()) {
+    return nullptr;
+  }
+  const char* SymbolName = Operand.getSymbolName();
+  BMOVS->removeOperand(1);
+  MCContext &Context = BMOVS->getParent()->getParent()->getContext();
+  MCSymbol *Sym = Context.createTempSymbol(SymbolName);
+  BMOVS->addOperand(MachineOperand::CreateMCSymbol(Sym));
+  return Sym;
+}
+
+MCSymbol* RISCVNS::getBranchSource(MachineInstr* PB) {
+  MachineBasicBlock *MBB = PB->getParent();
+  Register Reg = getPBBranchRegister(PB);
+  for (auto It = PB->getReverseIterator(); It != MBB->rend(); ++It) {
+    MachineInstr& MI = *It;
+    if (MI.getOpcode() != RISCV::BMOVS_J)
+      continue;
+    if (MI.getOperand(0).getReg() != Reg)
+      continue;
+    return getBranchSourceHelper(&MI);
+  }
+  llvm_unreachable("[non-spec] :(");
+}
+
+void RISCVNS::fixBranchSource(MachineInstr *BMOVS) {
+  if (BMOVS->getOperand(1).isImm()) {
+    return; // probably ok right?
+  }
+  MachineBasicBlock *MBB = BMOVS->getParent();
+  Register Reg = BMOVS->getOperand(0).getReg();
+  for (auto It = BMOVS->getIterator(); It != MBB->end(); ++It) {
+    MachineInstr& MI = *It;
+    if (!isPB(MI.getOpcode()))
+      continue;
+    if (getPBBranchRegister(&MI) != Reg)
+      continue;
+    getBranchSourceHelper(BMOVS);
+    return;
+  }
+  llvm_unreachable("[non-spec] :(");
+}
+
+void RISCVNS::fixBranchTarget(MachineInstr *BMOVT) {
+  MachineBasicBlock *MBB = BMOVT->getParent();
+  Register Reg = BMOVT->getOperand(0).getReg();
+  for (auto It = BMOVT->getIterator(); It != MBB->end(); ++It) {
+    MachineInstr& PB = *It;
+    if (!isPB(PB.getOpcode()))
+      continue;
+    if (getPBBranchRegister(&PB) != Reg)
+      continue;
+
+    MachineBasicBlock *TargetMBB = PB.getOperand(1).getMBB();
+    BMOVT->getOperand(1).setMBB(TargetMBB);
+    return;
+  }
+  llvm_unreachable("[non-spec] :(");
 }

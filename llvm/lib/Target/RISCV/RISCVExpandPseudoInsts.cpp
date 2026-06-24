@@ -378,15 +378,12 @@ bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
       MBBI->getOpcode() == RISCV::PseudoJump) {
     // Emit PBAL (JALR X0, Ra, 0)
     BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBU))
-        .addReg(BReg)
-        .addImm(-1); // This is where branch index will be assigned
-    MI->addOperand(*Func);
+        .addReg(BReg)->addOperand(*Func);
   }
   else {
     // Emit PBAL (JALR Ra, Ra, 0)
     BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBI))
         .addReg(BReg)
-        .addImm(-1)
         .addReg(Ra);
   }
 

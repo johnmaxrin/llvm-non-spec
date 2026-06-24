@@ -17,6 +17,7 @@
 #include "MCTargetDesc/RISCVMatInt.h"
 #include "MCTargetDesc/RISCVTargetStreamer.h"
 #include "RISCV.h"
+#include "RISCVNonSpec.h"
 #include "RISCVConstantPoolValue.h"
 #include "RISCVMachineFunctionInfo.h"
 #include "RISCVRegisterInfo.h"
@@ -318,8 +319,7 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
         OutStreamer->emitLabel(Operand.getMCSymbol());
       }
       else {
-        const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
-        MCSymbol* Source = MFI->getBranchSource(const_cast<MachineInstr*>(MI));
+        MCSymbol* Source = RISCVNS::getBranchSource(const_cast<MachineInstr*>(MI));
         OutStreamer->emitLabel(Source);
       }
     }
@@ -329,19 +329,16 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
   switch (MI->getOpcode()) {
   case RISCV::PBAL: {
-    const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
-    if (MCSymbol* Source = MFI->getBranchSource(const_cast<MachineInstr*>(MI)))
+    if (MCSymbol* Source = RISCVNS::getBranchSource(const_cast<MachineInstr*>(MI)))
       OutStreamer->emitLabel(Source);
     break;
   }
   case RISCV::BMOVS_J: {
-    const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
-    MFI->fixBranchSource(const_cast<MachineInstr*>(MI));
+    RISCVNS::fixBranchSource(const_cast<MachineInstr*>(MI));
     break;
   }
   case RISCV::BMOVT_J: {
-    const RISCVMachineFunctionInfo *MFI = MI->getParent()->getParent()->getInfo<RISCVMachineFunctionInfo>();
-    MFI->fixBranchTarget(const_cast<MachineInstr*>(MI));
+    RISCVNS::fixBranchTarget(const_cast<MachineInstr*>(MI));
     break;
   }
   case RISCV::HWASAN_CHECK_MEMACCESS_SHORTGRANULES:

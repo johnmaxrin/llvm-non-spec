@@ -44,9 +44,9 @@ struct Branch {
   explicit Branch(MachineInstr *BS, MachineInstr *BT, MachineInstr *PB)
   : BMOVS(BS), BMOVT(BT), PB(PB) {}
 
-  Branch parseFromPB(MachineInstr* PB) {
-
-  }
+  // Branch parseFromPB(MachineInstr* PB) {
+  //   
+  // }
 };
 
 bool RISCVBranchScheduler::runOnMachineFunction(MachineFunction &MF) {
@@ -65,6 +65,7 @@ bool RISCVBranchScheduler::runOnMachineFunction(MachineFunction &MF) {
   // - Need to separate CALL, RET, INDIRECT
 
   int BranchRegistersNeeded = 0;
+  (void)BranchRegistersNeeded;
 
   for (auto &MBB : MF) {
     for (auto I = MBB.rbegin(), E = MBB.rend(); I != E; ) {

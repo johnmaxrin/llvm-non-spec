@@ -1029,13 +1029,12 @@ static void parseCondBranch(MachineInstr &LastInst, MachineBasicBlock *&Target,
   // Block ends with fall-through condbranch.
   assert(LastInst.getDesc().isConditionalBranch() &&
          "Unknown conditional branch");
-  MachineFunction* MF = LastInst.getParent()->getParent();
-  RISCVMachineFunctionInfo* MFI = MF->getInfo<RISCVMachineFunctionInfo>();
-  Target = MFI->getBranchTarget(&LastInst);
-  //Target = LastInst.getOperand(2).getMBB();
-  Cond.push_back(MachineOperand::CreateImm(MFI->getBranchOpcode(&LastInst)));
-  Cond.push_back(MFI->getBranchReg(&LastInst, 0));
-  Cond.push_back(MFI->getBranchReg(&LastInst, 1));
+  RISCVNS::BMOVSupport Support = RISCVNS::getBMOVSupport(&LastInst);
+  Target = Support.targetbb;
+  assert(Support.condition != nullptr);
+  Cond.push_back(MachineOperand::CreateImm(Support.condition->getOpcode()));
+  Cond.push_back(Support.condition->getOperand(1));
+  Cond.push_back(Support.condition->getOperand(2));
 }
 
 unsigned RISCVCC::getBrCond(RISCVCC::CondCode CC, unsigned SelectOpc) {
@@ -1234,8 +1233,6 @@ bool RISCVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
 
 unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
                                       int *BytesRemoved) const {
-  MachineFunction *MF = MBB.getParent();
-  RISCVMachineFunctionInfo *MFI = MF->getInfo<RISCVMachineFunctionInfo>();
   unsigned NumberOfInstructionsRemoved = 0;
 
   if (BytesRemoved)
@@ -1250,7 +1247,7 @@ unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
 
   // Remove the branch.
   // I->eraseFromParent();
-  NumberOfInstructionsRemoved += MFI->removeBranchComplete(&*I, BytesRemoved);
+  NumberOfInstructionsRemoved += RISCVNS::removeBranchComplete(&*I, BytesRemoved);
 
   I = MBB.end();
 
@@ -1262,7 +1259,7 @@ unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
 
   // Remove the branch.
   // I->eraseFromParent();
-  NumberOfInstructionsRemoved += MFI->removeBranchComplete(&*I, BytesRemoved);
+  NumberOfInstructionsRemoved += RISCVNS::removeBranchComplete(&*I, BytesRemoved);
   return NumberOfInstructionsRemoved;
 }
 
@@ -1275,7 +1272,7 @@ unsigned RISCVInstrInfo::insertBranch(
   if (BytesAdded)
     *BytesAdded = 0;
 
-  RISCVNonSpec::UseVirtualRegisters = false;
+  RISCVNS::UseVirtualRegisters = false;
 
   // Shouldn't be a fall through.
   assert(TBB && "insertBranch must not be told to insert a fallthrough");
@@ -1284,12 +1281,12 @@ unsigned RISCVInstrInfo::insertBranch(
 
   // Unconditional branch.
   if (Cond.empty()) {
-    RISCVNonSpec::insertUnconditionalBranch(MBB, DL, TBB, "ns_ju_", BytesAdded);
+    RISCVNS::insertUnconditionalBranch(MBB, DL, TBB, "ns_ju_", BytesAdded);
     return 1;
   }
 
   // Either a one or two-way conditional branch.
-  RISCVNonSpec::insertConditionalBranch(MBB,
+  RISCVNS::insertConditionalBranch(MBB,
     DL, getCondFromBranchOpc(Cond[0].getImm()), Cond[1].getReg(), Cond[2].getReg(), TBB, BytesAdded);
   //MachineInstr &CondMI = *BuildMI(&MBB, DL, get(Cond[0].getImm()))
   //                            .add(Cond[1])
@@ -1302,7 +1299,7 @@ unsigned RISCVInstrInfo::insertBranch(
 
   // Two-way conditional branch.
   // TODO(non-spec): Need to insert BMOV's
-  RISCVNonSpec::insertUnconditionalBranch(MBB, DL, FBB, "ns_false_", BytesAdded);
+  RISCVNS::insertUnconditionalBranch(MBB, DL, FBB, "ns_false_", BytesAdded);
   return 2;
 }
 
@@ -1501,10 +1498,11 @@ bool RISCVInstrInfo::isFromLoadImm(const MachineRegisterInfo &MRI,
 bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
   MachineBasicBlock *MBB = MI.getParent();
   MachineRegisterInfo &MRI = MBB->getParent()->getRegInfo();
-  const RISCVMachineFunctionInfo *MFI = MBB->getParent()->getInfo<RISCVMachineFunctionInfo>();
 
   assert(MI.getOpcode() == RISCV::PseudoPBC);
-  RISCVCC::CondCode CC = MFI->getBranchCond(&MI);
+  RISCVNS::BMOVSupport Support = RISCVNS::getBMOVSupport(&MI);
+  assert(Support.condition != nullptr);
+  RISCVCC::CondCode CC = getCondFromBranchOpc(Support.condition->getOpcode());
   assert(CC != RISCVCC::COND_INVALID);
 
   bool IsSigned = false;
@@ -1525,9 +1523,9 @@ bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
     break;
   }
 
-  const MachineOperand &LHS = MI.getOperand(0);
-  const MachineOperand &RHS = MI.getOperand(1);
-  MachineBasicBlock *TBB = MI.getOperand(2).getMBB();
+  const MachineOperand &LHS = Support.condition->getOperand(1);
+  const MachineOperand &RHS = Support.condition->getOperand(2);
+  MachineBasicBlock *TBB = Support.target->getOperand(1).getMBB();
 
   // Canonicalize conditional branches which can be constant folded into
   // beqz or bnez.  We can't modify the CFG here.
@@ -1678,7 +1676,7 @@ bool RISCVInstrInfo::isBranchOffsetInRange(unsigned BranchOp,
     return isInt<32>(SignExtend64(BrOffset + 0x800, XLen));
   case RISCV::PseudoPBU:
   case RISCV::PseudoPBC:
-  case RISCV::PBAL:
+  //case RISCV::PBAL: // TODO(mitch): this needed?
     return true;
   }
 }
