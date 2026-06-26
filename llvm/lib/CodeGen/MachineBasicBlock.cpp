@@ -1491,16 +1491,18 @@ void MachineBasicBlock::ReplaceUsesOfBlockWith(MachineBasicBlock *Old,
                                                MachineBasicBlock *New) {
   assert(Old != New && "Cannot replace self with self!");
 
-  MachineBasicBlock::instr_iterator I = instr_end();
-  while (I != instr_begin()) {
-    --I;
-    // NOTE: [Non-Spec] I don't know the consequences of this change!
-    //       This has the potential to break many things!
-    if (!I->isTerminator() && !I->isBMOV()) break;
+  // NOTE(mitch): Here we need to change all terminators to point to the new BB.
+  //              Since BMOVs can appear anywhere in a BB (not just at the end),
+  //              we need to iterate over all instructions. We need to modify
+  //              all branch instructions (not just BMOVs) because pseudo
+  //              branch instructions also have BB operands.
+  for (auto &MI: *this) {
+    if (!MI.isBMOV() && !MI.isBranch())
+      continue;
 
     // Scan the operands of this machine instruction, replacing any uses of Old
     // with New.
-    for (MachineOperand &MO : I->operands())
+    for (MachineOperand &MO : MI.operands())
       if (MO.isMBB() && MO.getMBB() == Old)
         MO.setMBB(New);
   }

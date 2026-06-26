@@ -1870,7 +1870,6 @@ def PseudoCALLReg : Pseudo<(outs GPR:$rd), (ins call_symbol:$func), [],
 //                        "call", "$func">,
 //                 Sched<[WriteIALU, WriteJalr, ReadJalr]>;
 
-// NOTE(non-spec): May need to modify here.
 def : Pat<(riscv_call tglobaladdr:$func), (PseudoCALL tglobaladdr:$func)>;
 def : Pat<(riscv_call texternalsym:$func), (PseudoCALL texternalsym:$func)>;
 

@@ -335,7 +335,7 @@ bool RISCVExpandPseudo::expandMV_FPR16INX(MachineBasicBlock &MBB,
 bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator MBBI) {
   MCInst TmpInst;
-  MachineOperand* Func;
+  MachineOperand* Func = nullptr;
   MCRegister Ra;
   const char* name = "invalid";
   if (MBBI->getOpcode() == RISCV::PseudoTAIL) {
