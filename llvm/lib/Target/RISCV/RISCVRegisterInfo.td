@@ -878,4 +878,6 @@ let RegInfos = XLenRI in {
 foreach Index = 0-31 in
   def B#Index : RISCVReg<Index, "b"#Index>;
 
-def PBR : RISCVRegisterClass<[untyped], 32, (add (sequence "B%u", 0, 31))>;
+let RegInfos = XLenRI in {
+  def PBR : RISCVRegisterClass<[untyped], 32, (add (sequence "B%u", 0, 31))>;
+}
