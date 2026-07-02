@@ -399,7 +399,7 @@ bool RISCVExpandPseudo::expandReturn(MachineBasicBlock &MBB,
   // Emit BMOVS B0, 8
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BReg)
-      .addImm(8);
+      .addExternalSymbol("ns_return_");
 
   // Emit BMOVT B0, Ra, 0
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_I))
@@ -408,8 +408,7 @@ bool RISCVExpandPseudo::expandReturn(MachineBasicBlock &MBB,
       .addImm(0);
 
   // Emit PBAL (JALR X0, Ra, 0)
-  BuildMI(MBB, MBBI, DL, TII->get(RISCV::PBAL))
-      .addReg(RISCV::X0)
+  BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBI))
       .addReg(BReg)
       .addReg(RISCV::X0);
 
@@ -429,7 +428,7 @@ bool RISCVExpandPseudo::expandIndirect(MachineBasicBlock &MBB,
   // Emit BMOVS B0, 8
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BReg)
-      .addImm(8);
+      .addExternalSymbol("ns_indirect_");
 
   // Emit BMOVT B0, Rs1, 0
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_I))
@@ -438,10 +437,9 @@ bool RISCVExpandPseudo::expandIndirect(MachineBasicBlock &MBB,
       .addImm(0);
 
   // Emit PBAL B0, RA
-  BuildMI(MBB, MBBI, DL, TII->get(RISCV::PBAL))
-      .addReg(Ra)
+  BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBI))
       .addReg(BReg)
-      .addReg(RISCV::X0);
+      .addReg(Ra);
 
   MBBI->eraseFromParent();
   return true;
