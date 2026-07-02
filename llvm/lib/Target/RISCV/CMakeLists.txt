@@ -33,6 +33,7 @@ add_llvm_target(RISCVCodeGen
 
   RISCVNSOpt.cpp
   RISCVAsmPrinter.cpp
+  RISCVBranchScheduler.cpp
   RISCVCallingConv.cpp
   RISCVCodeGenPrepare.cpp
   RISCVConstantPoolValue.cpp

@@ -119,6 +119,11 @@ static cl::opt<bool>
                            cl::desc("Enable Machine Pipeliner for RISC-V"),
                            cl::init(false), cl::Hidden);
 
+static cl::opt<bool>
+    EnableBranchScheduler("riscv-enable-branch-scheduler",
+                           cl::desc("Enable Branch Scheduler for RISC-V"),
+                           cl::init(false), cl::Hidden);
+
 extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   RegisterTargetMachine<RISCVTargetMachine> X(getTheRISCV32Target());
   RegisterTargetMachine<RISCVTargetMachine> Y(getTheRISCV64Target());
@@ -153,9 +158,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVExpandAtomicPseudoPass(*PR);
   initializeRISCVRedundantCopyEliminationPass(*PR);
   initializeRISCVAsmPrinterPass(*PR);
-
-  // Non Spec Passes
-  initializeRISCVNSBranchOptPass(*PR);
+  initializeRISCVBranchSchedulerPass(*PR);
 }
 
 static StringRef computeDataLayout(const Triple &TT,
@@ -601,9 +604,8 @@ void RISCVPassConfig::addPreEmitPass2() {
     return MF.getFunction().getParent()->getModuleFlag("kcfi");
   }));
 
-
-  // Non Spec Passes
-  addPass(createRISCVNSBranchOptPass());
+  if (EnableBranchScheduler)
+    addPass(createRISCVBranchSchedulerPass());
 }
 
 void RISCVPassConfig::addMachineSSAOptimization() {

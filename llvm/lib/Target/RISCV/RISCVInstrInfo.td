@@ -1792,16 +1792,20 @@ def PseudoLongBGEU : LongBccPseudo;
 /*
     PB   Unconditional -> PBU
     PB   Conditional   -> PBC
-    PBAL Unconditional -> PBALU
+    PB   Indirect      -> PBI
 */
 
 let isBarrier = 0, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
-def PseudoPBC : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, simm21_lsb0_jal:$imm20), []>,
+def PseudoPBC : Pseudo<(outs), (ins PBR:$rs1, simm21_lsb0_jal:$imm20), []>,
                 PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
 
 let isBarrier = 1, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
-def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, i32imm:$brid, simm21_lsb0_jal:$imm20), []>,
+def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, simm21_lsb0_jal:$imm20), []>,
                 PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
+
+let isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
+def PseudoPBI : Pseudo<(outs), (ins PBR:$rs1, GPRJALR:$dst), []>,
+                PseudoInstExpansion<(PBAL GPR:$dst, PBR:$rs1, X0)>;
 
 let isCall = 1, Defs = [X1], isCodeGenOnly = 0, Size = 16 in
 def PseudoCALL : Pseudo<(outs), (ins call_symbol:$func), [],
@@ -1814,12 +1818,12 @@ let isBarrier = 1, isBranch = 1, isTerminator = 1, usesCustomInserter = 1 in
 def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>;
 
 let Predicates = [NoStdExtZicfilp],
-    isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1 in
+    isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1, Size = 16 in
 def PseudoBRIND : Pseudo<(outs), (ins GPRJALR:$rs1, simm12:$imm12), []>;
                   //PseudoInstExpansion<(JALR X0, GPR:$rs1, simm12:$imm12)>;
 
 let Predicates = [HasStdExtZicfilp],
-    isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1 in {
+    isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1, Size = 16 in {
 def PseudoBRINDNonX7 : Pseudo<(outs), (ins GPRJALRNonX7:$rs1, simm12:$imm12), []>;
                        //PseudoInstExpansion<(JALR X0, GPR:$rs1, simm12:$imm12)>;
 def PseudoBRINDX7 : Pseudo<(outs), (ins GPRX7:$rs1, simm12:$imm12), []>;
@@ -1849,7 +1853,7 @@ def : Pat<(brind (add GPRJALR:$rs1, simm12:$imm12)),
 // destination.
 // Define AsmString to print "call" when compile with -S flag.
 // Define isCodeGenOnly = 0 to support parsing assembly "call" instruction.
-let isCall = 1, isBarrier = 1, isCodeGenOnly = 0, Size = 8, hasSideEffects = 0,
+let isCall = 1, isBarrier = 1, isCodeGenOnly = 0, Size = 16, hasSideEffects = 0,
     mayStore = 0, mayLoad = 0 in
 def PseudoCALLReg : Pseudo<(outs GPR:$rd), (ins call_symbol:$func), [],
                            "call", "$rd, $func">,
@@ -1866,14 +1870,13 @@ def PseudoCALLReg : Pseudo<(outs GPR:$rd), (ins call_symbol:$func), [],
 //                        "call", "$func">,
 //                 Sched<[WriteIALU, WriteJalr, ReadJalr]>;
 
-// NOTE(non-spec): May need to modify here.
 def : Pat<(riscv_call tglobaladdr:$func), (PseudoCALL tglobaladdr:$func)>;
 def : Pat<(riscv_call texternalsym:$func), (PseudoCALL texternalsym:$func)>;
 
 def : Pat<(riscv_sret_glue), (SRET)>;
 def : Pat<(riscv_mret_glue), (MRET)>;
 
-let isCall = 1, Defs = [X1] in {
+let isCall = 1, Defs = [X1], Size = 12 in {
 let Predicates = [NoStdExtZicfilp] in
 def PseudoCALLIndirect : Pseudo<(outs), (ins GPRJALR:$rs1),
                                 [(riscv_call GPRJALR:$rs1)]>;
@@ -1893,12 +1896,12 @@ def PseudoCALLIndirectX7 : Pseudo<(outs), (ins GPRX7:$rs1),
 // expand to auipc and jalr while encoding.
 // Define AsmString to print "tail" when compile with -S flag.
 let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2],
-    Size = 8, isCodeGenOnly = 0 in
+    Size = 16, isCodeGenOnly = 0 in
 def PseudoTAIL : Pseudo<(outs), (ins call_symbol:$dst), [],
                         "tail", "$dst">,
                  Sched<[WriteIALU, WriteJalr, ReadJalr]>;
 
-let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2] in {
+let isCall = 1, isTerminator = 1, isReturn = 1, isBarrier = 1, Uses = [X2], Size = 12 in {
 let Predicates = [NoStdExtZicfilp] in
 def PseudoTAILIndirect : Pseudo<(outs), (ins GPRTC:$rs1),
                                 [(riscv_tail GPRTC:$rs1)]>;
@@ -1919,7 +1922,7 @@ def : Pat<(riscv_tail (iPTR tglobaladdr:$dst)),
 def : Pat<(riscv_tail (iPTR texternalsym:$dst)),
           (PseudoTAIL texternalsym:$dst)>;
 
-let isCall = 0, isBarrier = 1, isBranch = 1, isTerminator = 1, Size = 8,
+let isCall = 0, isBarrier = 1, isBranch = 1, isTerminator = 1, Size = 16,
     isCodeGenOnly = 0, hasSideEffects = 0, mayStore = 0, mayLoad = 0 in
 def PseudoJump : Pseudo<(outs GPR:$rd), (ins pseudo_jump_symbol:$target), [],
                         "jump", "$target, $rd">,

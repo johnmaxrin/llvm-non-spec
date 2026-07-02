@@ -21265,12 +21265,12 @@ static MachineBasicBlock *emitPseudoCCBMOV(MachineInstr &MI, MachineBasicBlock *
   Register rs1 = MI.getOperand(0).getReg();
   Register rs2 = MI.getOperand(1).getReg();
   MachineBasicBlock *TargetBB = MI.getOperand(2).getMBB();
-  RISCVNonSpec::insertConditionalBranch(*MBB, &MI, rs1, rs2, TargetBB);
+  RISCVNS::insertConditionalBranch(*MBB, &MI, rs1, rs2, TargetBB);
   return MBB;
 }
 
 static MachineBasicBlock *emitPseudoBMOV(MachineInstr &MI, MachineBasicBlock *MBB) {
-  RISCVNonSpec::insertUnconditionalBranch(*MBB, &MI, MI.getOperand(0).getMBB(), "ns_j_");
+  RISCVNS::insertUnconditionalBranch(*MBB, &MI, MI.getOperand(0).getMBB(), "ns_j_");
   return MBB;
 }
 
@@ -21517,7 +21517,7 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register FLHS = First.getOperand(1).getReg();
   Register FRHS = First.getOperand(2).getReg();
   // Insert appropriate branch.
-  RISCVNonSpec::insertConditionalBranch(*FirstMBB, DL, FirstCC, FLHS, FRHS, SinkMBB, nullptr);
+  RISCVNS::insertConditionalBranch(*FirstMBB, DL, FirstCC, FLHS, FRHS, SinkMBB, nullptr);
   //BuildMI(FirstMBB, DL, TII.get(RISCVCC::getBrCond(FirstCC, First.getOpcode())))
   //    .addReg(FLHS)
   //    .addReg(FRHS)
@@ -21529,7 +21529,7 @@ EmitLoweredCascadedSelect(MachineInstr &First, MachineInstr &Second,
   Register Op1Reg5 = First.getOperand(5).getReg();
 
   auto SecondCC = static_cast<RISCVCC::CondCode>(Second.getOperand(3).getImm());
-  RISCVNonSpec::insertConditionalBranch(*ThisMBB, DL, SecondCC, SLHS, SRHS, SinkMBB, nullptr);
+  RISCVNS::insertConditionalBranch(*ThisMBB, DL, SecondCC, SLHS, SRHS, SinkMBB, nullptr);
   // Insert appropriate branch.
   //BuildMI(ThisMBB, DL,
   //        TII.get(RISCVCC::getBrCond(SecondCC, Second.getOpcode())))
@@ -21676,7 +21676,7 @@ static MachineBasicBlock *emitSelectPseudo(MachineInstr &MI,
         .addMBB(TailMBB);
   }
   else {
-    RISCVNonSpec::insertConditionalBranch(*HeadMBB, DL, CC, LHS, RHS, TailMBB, nullptr);
+    RISCVNS::insertConditionalBranch(*HeadMBB, DL, CC, LHS, RHS, TailMBB, nullptr);
 
     //BuildMI(HeadMBB, DL, TII.get(Br))
     //    .addReg(LHS)
