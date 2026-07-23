@@ -232,11 +232,11 @@ bool RISCVBranchScheduler::runOnMachineFunction(MachineFunction &MF) {
     BranchGroupInfo BGI;          // Local per block
     BGI.build(MBB);               // Discovers groups and reassigns registers
 
-    // Print groups if requested (before hoisting)
-    if (1) {
-      dbgs() << "Groups in " << printMBBReference(MBB) << ":\n";
-      BGI.print(dbgs(), TRI);
-    }
+    // // Print groups if requested (before hoisting)
+    // if (1) {
+    //   dbgs() << "Groups in " << printMBBReference(MBB) << ":\n";
+    //   BGI.print(dbgs(), TRI);
+    // }
     LLVM_DEBUG({
       dbgs() << "Groups in " << printMBBReference(MBB) << ":\n";
       BGI.print(dbgs(), TRI);
