@@ -70,7 +70,7 @@ public:
               G.BMOVC = &*It2;
               continue;
             }
-            if (!G.PB && RISCVNonSpec::isPB(It2->getOpcode()) &&
+            if (!G.PB && RISCVNS::isPB(It2->getOpcode()) &&
                 hasReg(*It2, OldReg)) {
               G.PB = &*It2;
               break;
@@ -199,8 +199,8 @@ public:
     }
   }
 
-  MF.getInfo<RISCVMachineFunctionInfo>()->setBMOVSMap(std::move(BMOVSMap));
-  MF.getInfo<RISCVMachineFunctionInfo>()->setBMOVTMap(std::move(BMOVTMap));
+  // MF.getInfo<RISCVMachineFunctionInfo>()->setBMOVSMap(std::move(BMOVSMap));
+  // MF.getInfo<RISCVMachineFunctionInfo>()->setBMOVTMap(std::move(BMOVTMap));
 
   return Changed;
 }
