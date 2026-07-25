@@ -21261,19 +21261,6 @@ RISCVTargetLowering::getTargetConstantFromLoad(LoadSDNode *Ld) const {
   return CNodeLo->getConstVal();
 }
 
-static MachineBasicBlock *emitPseudoCCBMOV(MachineInstr &MI, MachineBasicBlock *MBB) {
-  Register rs1 = MI.getOperand(0).getReg();
-  Register rs2 = MI.getOperand(1).getReg();
-  MachineBasicBlock *TargetBB = MI.getOperand(2).getMBB();
-  RISCVNS::insertConditionalBranch(*MBB, &MI, rs1, rs2, TargetBB);
-  return MBB;
-}
-
-static MachineBasicBlock *emitPseudoBMOV(MachineInstr &MI, MachineBasicBlock *MBB) {
-  RISCVNS::insertUnconditionalBranch(*MBB, &MI, MI.getOperand(0).getMBB(), "ns_j_");
-  return MBB;
-}
-
 static MachineBasicBlock *emitReadCounterWidePseudo(MachineInstr &MI,
                                                     MachineBasicBlock *BB) {
   assert(MI.getOpcode() == RISCV::ReadCounterWide && "Unexpected instruction");
@@ -21665,24 +21652,14 @@ static MachineBasicBlock *emitSelectPseudo(MachineInstr &MI,
   HeadMBB->addSuccessor(IfFalseMBB);
   HeadMBB->addSuccessor(TailMBB);
 
-  unsigned Br = RISCVCC::getBrCond(CC, MI.getOpcode());
-
   // Insert appropriate branch.
-  if (MI.getOperand(2).isImm()) {
-    llvm_unreachable("Branch With Immediate Not Implemented");
-    BuildMI(HeadMBB, DL, TII.get(Br))
+  if (MI.getOperand(2).isImm())
+    BuildMI(HeadMBB, DL, TII.get(RISCVCC::getBrCond(CC, MI.getOpcode())));
+  else
+    BuildMI(HeadMBB, DL, TII.get(RISCVCC::getBrCond(CC, MI.getOpcode())))
         .addReg(LHS)
-        .addImm(MI.getOperand(2).getImm())
+        .addReg(RHS)
         .addMBB(TailMBB);
-  }
-  else {
-    RISCVNS::insertConditionalBranch(*HeadMBB, DL, CC, LHS, RHS, TailMBB, nullptr);
-
-    //BuildMI(HeadMBB, DL, TII.get(Br))
-    //    .addReg(LHS)
-    //    .addReg(RHS)
-    //    .addMBB(TailMBB);
-  }
 
   // IfFalseMBB just falls through to TailMBB.
   IfFalseMBB->addSuccessor(TailMBB);
@@ -21923,15 +21900,6 @@ RISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
   switch (MI.getOpcode()) {
   default:
     llvm_unreachable("Unexpected instr type to insert");
-  case RISCV::PseudoBREQ:
-  case RISCV::PseudoBRNE:
-  case RISCV::PseudoBRLT:
-  case RISCV::PseudoBRGE:
-  case RISCV::PseudoBRLTU:
-  case RISCV::PseudoBRGEU:
-    return emitPseudoCCBMOV(MI, BB);
-  case RISCV::PseudoBR:
-    return emitPseudoBMOV(MI, BB);
   case RISCV::ReadCounterWide:
     assert(!Subtarget.is64Bit() &&
            "ReadCounterWide is only to be used on riscv32");

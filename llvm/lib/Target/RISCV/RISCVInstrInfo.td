@@ -1734,7 +1734,7 @@ multiclass SelectCC_GPR_riirr<DAGOperand valty, DAGOperand imm> {
 
 /// Branches and jumps
 
-let isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0, usesCustomInserter = 1 in {
+let isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0, Size = 16 in {
 def PseudoBREQ : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
 def PseudoBRNE : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
 def PseudoBRLT : Pseudo<(outs), (ins GPR:$rs1, GPR:$rs2, bare_simm13_lsb0_bb:$dst), []>, Sched<[WriteJmp, ReadJmp, ReadJmp]>;
@@ -1814,7 +1814,7 @@ def PseudoCALL : Pseudo<(outs), (ins call_symbol:$func), [],
 let isBarrier = 1, isReturn = 1, isTerminator = 1, isCodeGenOnly = 0, Size = 12 in
 def PseudoRET : Pseudo<(outs), (ins), [(riscv_ret_glue)], "ret">;
 
-let isBarrier = 1, isBranch = 1, isTerminator = 1, usesCustomInserter = 1 in
+let isBarrier = 1, isBranch = 1, isTerminator = 1, Size = 12 in
 def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>;
 
 let Predicates = [NoStdExtZicfilp],

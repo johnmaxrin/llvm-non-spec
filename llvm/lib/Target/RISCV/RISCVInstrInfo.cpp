@@ -968,7 +968,7 @@ RISCVCC::CondCode RISCVInstrInfo::getCondFromBranchOpc(unsigned Opc) {
   case RISCV::QC_E_BEQI:
   case RISCV::NDS_BBC:
   case RISCV::NDS_BEQC:
-  case RISCV::BMOVC_BEQ:
+  case RISCV::PseudoBREQ:
     return RISCVCC::COND_EQ;
   case RISCV::BNE:
   case RISCV::QC_BNEI:
@@ -976,27 +976,27 @@ RISCVCC::CondCode RISCVInstrInfo::getCondFromBranchOpc(unsigned Opc) {
   case RISCV::CV_BNEIMM:
   case RISCV::NDS_BBS:
   case RISCV::NDS_BNEC:
-  case RISCV::BMOVC_BNE:
+  case RISCV::PseudoBRNE:
     return RISCVCC::COND_NE;
   case RISCV::BLT:
   case RISCV::QC_BLTI:
   case RISCV::QC_E_BLTI:
-  case RISCV::BMOVC_BLT:
+  case RISCV::PseudoBRLT:
     return RISCVCC::COND_LT;
   case RISCV::BGE:
   case RISCV::QC_BGEI:
   case RISCV::QC_E_BGEI:
-  case RISCV::BMOVC_BGE:
+  case RISCV::PseudoBRGE:
     return RISCVCC::COND_GE;
   case RISCV::BLTU:
   case RISCV::QC_BLTUI:
   case RISCV::QC_E_BLTUI:
-  case RISCV::BMOVC_BLTU:
+  case RISCV::PseudoBRLTU:
     return RISCVCC::COND_LTU;
   case RISCV::BGEU:
   case RISCV::QC_BGEUI:
   case RISCV::QC_E_BGEUI:
-  case RISCV::BMOVC_BGEU:
+  case RISCV::PseudoBRGEU:
     return RISCVCC::COND_GEU;
   }
 }
@@ -1029,12 +1029,10 @@ static void parseCondBranch(MachineInstr &LastInst, MachineBasicBlock *&Target,
   // Block ends with fall-through condbranch.
   assert(LastInst.getDesc().isConditionalBranch() &&
          "Unknown conditional branch");
-  RISCVNS::BMOVSupport Support = RISCVNS::getBMOVSupport(&LastInst);
-  Target = Support.targetbb;
-  assert(Support.condition != nullptr);
-  Cond.push_back(MachineOperand::CreateImm(Support.condition->getOpcode()));
-  Cond.push_back(Support.condition->getOperand(1));
-  Cond.push_back(Support.condition->getOperand(2));
+  Target = LastInst.getOperand(2).getMBB();
+  Cond.push_back(MachineOperand::CreateImm(LastInst.getOpcode()));
+  Cond.push_back(LastInst.getOperand(0));
+  Cond.push_back(LastInst.getOperand(1));
 }
 
 unsigned RISCVCC::getBrCond(RISCVCC::CondCode CC, unsigned SelectOpc) {
@@ -1046,17 +1044,17 @@ unsigned RISCVCC::getBrCond(RISCVCC::CondCode CC, unsigned SelectOpc) {
       // TODO [non-spec]: This will almost certainly break things,
       //                  so find everywhere this function is called!
     case RISCVCC::COND_EQ:
-      return RISCV::BMOVC_BEQ;
+      return RISCV::PseudoBREQ;
     case RISCVCC::COND_NE:
-      return RISCV::BMOVC_BNE;
+      return RISCV::PseudoBRNE;
     case RISCVCC::COND_LT:
-      return RISCV::BMOVC_BLT;
+      return RISCV::PseudoBRLT;
     case RISCVCC::COND_GE:
-      return RISCV::BMOVC_BGE;
+      return RISCV::PseudoBRGE;
     case RISCVCC::COND_LTU:
-      return RISCV::BMOVC_BLTU;
+      return RISCV::PseudoBRLTU;
     case RISCVCC::COND_GEU:
-      return RISCV::BMOVC_BGEU;
+      return RISCV::PseudoBRGEU;
     }
     break;
   case RISCV::Select_GPR_Using_CC_SImm5_CV:
@@ -1209,19 +1207,28 @@ bool RISCVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
 
   // Handle a single unconditional branch.
   if (NumTerminators == 1 && I->getDesc().isUnconditionalBranch()) {
+    // We can't handle branches that have already been expanded
+    if (I->getOpcode() == RISCV::PseudoPBU)
+      return true; // TODO: non-spec: maybe special case here?
     TBB = getBranchDestBlock(*I);
     return false;
   }
 
   // Handle a single conditional branch.
   if (NumTerminators == 1 && I->getDesc().isConditionalBranch()) {
+    // We can't handle branches that have already been expanded
+    if (I->getOpcode() == RISCV::PseudoPBC)
+      return true; // TODO: non-spec: maybe special case here?
     parseCondBranch(*I, TBB, Cond);
     return false;
   }
 
   // Handle a conditional branch followed by an unconditional branch.
   if (NumTerminators == 2 && std::prev(I)->getDesc().isConditionalBranch() &&
-      I->getDesc().isUnconditionalBranch()) {
+  I->getDesc().isUnconditionalBranch()) {
+    // We can't handle branches that have already been expanded
+    if (I->getOpcode() == RISCV::PseudoPBU || std::prev(I)->getOpcode() == RISCV::PseudoPBC)
+      return true; // TODO: non-spec: maybe special case here?
     parseCondBranch(*std::prev(I), TBB, Cond);
     FBB = getBranchDestBlock(*I);
     return false;
@@ -1233,34 +1240,34 @@ bool RISCVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
 
 unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
                                       int *BytesRemoved) const {
-  unsigned NumberOfInstructionsRemoved = 0;
-
   if (BytesRemoved)
     *BytesRemoved = 0;
   MachineBasicBlock::iterator I = MBB.getLastNonDebugInstr();
   if (I == MBB.end())
-    return NumberOfInstructionsRemoved;
+    return 0;
 
   if (!I->getDesc().isUnconditionalBranch() &&
       !I->getDesc().isConditionalBranch())
-    return NumberOfInstructionsRemoved;
+    return 0;
 
   // Remove the branch.
-  // I->eraseFromParent();
-  NumberOfInstructionsRemoved += RISCVNS::removeBranchComplete(&*I, BytesRemoved);
+  if (BytesRemoved)
+      *BytesRemoved += getInstSizeInBytes(*I);
+  I->eraseFromParent();
 
   I = MBB.end();
 
   if (I == MBB.begin())
-    return NumberOfInstructionsRemoved;
+    return 1;
   --I;
   if (!I->getDesc().isConditionalBranch())
-    return NumberOfInstructionsRemoved;
+    return 1;
 
   // Remove the branch.
-  // I->eraseFromParent();
-  NumberOfInstructionsRemoved += RISCVNS::removeBranchComplete(&*I, BytesRemoved);
-  return NumberOfInstructionsRemoved;
+  if (BytesRemoved)
+    *BytesRemoved += getInstSizeInBytes(*I);
+  I->eraseFromParent();
+  return 2;
 }
 
 // Inserts a branch into the end of the specific MachineBasicBlock, returning
@@ -1279,25 +1286,28 @@ unsigned RISCVInstrInfo::insertBranch(
 
   // Unconditional branch.
   if (Cond.empty()) {
-    RISCVNS::insertUnconditionalBranch(MBB, DL, TBB, "ns_ju_", BytesAdded);
+    MachineInstr &MI = *BuildMI(&MBB, DL, get(RISCV::PseudoBR)).addMBB(TBB);
+    if (BytesAdded)
+      *BytesAdded += getInstSizeInBytes(MI);
     return 1;
   }
 
   // Either a one or two-way conditional branch.
-  RISCVNS::insertConditionalBranch(MBB,
-    DL, getCondFromBranchOpc(Cond[0].getImm()), Cond[1].getReg(), Cond[2].getReg(), TBB, BytesAdded);
-  //MachineInstr &CondMI = *BuildMI(&MBB, DL, get(Cond[0].getImm()))
-  //                            .add(Cond[1])
-  //                            .add(Cond[2])
-  //                            .addMBB(TBB);
+  MachineInstr &CondMI = *BuildMI(&MBB, DL, get(Cond[0].getImm()))
+                              .add(Cond[1])
+                              .add(Cond[2])
+                              .addMBB(TBB);
+  if (BytesAdded)
+    *BytesAdded += getInstSizeInBytes(CondMI);
 
   // One-way conditional branch.
   if (!FBB)
     return 1;
 
   // Two-way conditional branch.
-  // TODO(non-spec): Need to insert BMOV's
-  RISCVNS::insertUnconditionalBranch(MBB, DL, FBB, "ns_false_", BytesAdded);
+  MachineInstr &MI = *BuildMI(&MBB, DL, get(RISCV::PseudoBR)).addMBB(FBB);
+  if (BytesAdded)
+    *BytesAdded += getInstSizeInBytes(MI);
   return 2;
 }
 
@@ -1373,41 +1383,23 @@ bool RISCVInstrInfo::reverseBranchCondition(
   switch (Cond[0].getImm()) {
   default:
     llvm_unreachable("Unknown conditional branch!");
-  case RISCV::BEQ:
-    Cond[0].setImm(RISCV::BNE);
+  case RISCV::PseudoBREQ:
+    Cond[0].setImm(RISCV::PseudoBRNE);
     break;
-  case RISCV::BNE:
-    Cond[0].setImm(RISCV::BEQ);
+  case RISCV::PseudoBRNE:
+    Cond[0].setImm(RISCV::PseudoBREQ);
     break;
-  case RISCV::BLT:
-    Cond[0].setImm(RISCV::BGE);
+  case RISCV::PseudoBRLT:
+    Cond[0].setImm(RISCV::PseudoBRGE);
     break;
-  case RISCV::BGE:
-    Cond[0].setImm(RISCV::BLT);
+  case RISCV::PseudoBRGE:
+    Cond[0].setImm(RISCV::PseudoBRLT);
     break;
-  case RISCV::BLTU:
-    Cond[0].setImm(RISCV::BGEU);
+  case RISCV::PseudoBRLTU:
+    Cond[0].setImm(RISCV::PseudoBRGEU);
     break;
-  case RISCV::BGEU:
-    Cond[0].setImm(RISCV::BLTU);
-    break;
-  case RISCV::BMOVC_BEQ:
-    Cond[0].setImm(RISCV::BMOVC_BNE);
-    break;
-  case RISCV::BMOVC_BNE:
-    Cond[0].setImm(RISCV::BMOVC_BEQ);
-    break;
-  case RISCV::BMOVC_BLT:
-    Cond[0].setImm(RISCV::BMOVC_BGE);
-    break;
-  case RISCV::BMOVC_BGE:
-    Cond[0].setImm(RISCV::BMOVC_BLT);
-    break;
-  case RISCV::BMOVC_BLTU:
-    Cond[0].setImm(RISCV::BMOVC_BGEU);
-    break;
-  case RISCV::BMOVC_BGEU:
-    Cond[0].setImm(RISCV::BMOVC_BLTU);
+  case RISCV::PseudoBRGEU:
+    Cond[0].setImm(RISCV::PseudoBRLTU);
     break;
   case RISCV::CV_BEQIMM:
     Cond[0].setImm(RISCV::CV_BNEIMM);
@@ -1494,36 +1486,33 @@ bool RISCVInstrInfo::isFromLoadImm(const MachineRegisterInfo &MRI,
 }
 
 bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
-  MachineBasicBlock *MBB = MI.getParent();
-  MachineRegisterInfo &MRI = MBB->getParent()->getRegInfo();
-
-  assert(MI.getOpcode() == RISCV::PseudoPBC);
-  RISCVNS::BMOVSupport Support = RISCVNS::getBMOVSupport(&MI);
-  assert(Support.condition != nullptr);
-  RISCVCC::CondCode CC = getCondFromBranchOpc(Support.condition->getOpcode());
-  assert(CC != RISCVCC::COND_INVALID);
-
   bool IsSigned = false;
   bool IsEquality = false;
-  switch (CC) {
+  switch (MI.getOpcode()) {
   default:
     return false;
-  case RISCVCC::COND_EQ:
-  case RISCVCC::COND_NE:
+  case RISCV::PseudoBREQ:
+  case RISCV::PseudoBRNE:
     IsEquality = true;
     break;
-  case RISCVCC::COND_GE:
-  case RISCVCC::COND_LT:
+  case RISCV::PseudoBRGE:
+  case RISCV::PseudoBRLT:
     IsSigned = true;
     break;
-  case RISCVCC::COND_GEU:
-  case RISCVCC::COND_LTU:
+  case RISCV::PseudoBRGEU:
+  case RISCV::PseudoBRLTU:
     break;
   }
 
-  const MachineOperand &LHS = Support.condition->getOperand(1);
-  const MachineOperand &RHS = Support.condition->getOperand(2);
-  MachineBasicBlock *TBB = Support.target->getOperand(1).getMBB();
+  MachineBasicBlock *MBB = MI.getParent();
+  MachineRegisterInfo &MRI = MBB->getParent()->getRegInfo();
+
+  const MachineOperand &LHS = MI.getOperand(0);
+  const MachineOperand &RHS = MI.getOperand(1);
+  MachineBasicBlock *TBB = MI.getOperand(2).getMBB();
+
+  RISCVCC::CondCode CC = getCondFromBranchOpc(MI.getOpcode());
+  assert(CC != RISCVCC::COND_INVALID);
 
   // Canonicalize conditional branches which can be constant folded into
   // beqz or bnez.  We can't modify the CFG here.
@@ -1531,7 +1520,6 @@ bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
   if (isFromLoadImm(MRI, LHS, C0) && isFromLoadImm(MRI, RHS, C1)) {
     unsigned NewOpc = evaluateCondBranch(CC, C0, C1) ? RISCV::BEQ : RISCV::BNE;
     // Build the new branch and remove the old one.
-    llvm_unreachable("TODO: [Non-Spec] replace condition to EQZ or NEZ");
     BuildMI(*MBB, MI, MI.getDebugLoc(), get(NewOpc))
         .addReg(RISCV::X0)
         .addReg(RISCV::X0)
@@ -1586,7 +1574,6 @@ bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
       MRI.hasOneUse(LHS.getReg()) && (IsSigned || C0 != -1)) {
     assert(isInt<12>(C0) && "Unexpected immediate");
     if (Register RegZ = searchConst(C0 + 1)) {
-      llvm_unreachable("TODO: [Non-Spec] replace condition to opposite condition");
       BuildMI(*MBB, MI, MI.getDebugLoc(), get(NewOpc))
           .add(RHS)
           .addReg(RegZ)
@@ -1608,7 +1595,6 @@ bool RISCVInstrInfo::optimizeCondBranch(MachineInstr &MI) const {
       MRI.hasOneUse(RHS.getReg())) {
     assert(isInt<12>(C0) && "Unexpected immediate");
     if (Register RegZ = searchConst(C0 - 1)) {
-      llvm_unreachable("TODO: [Non-Spec] replace condition to opposite condition");
       BuildMI(*MBB, MI, MI.getDebugLoc(), get(NewOpc))
           .addReg(RegZ)
           .add(LHS)
@@ -1672,9 +1658,13 @@ bool RISCVInstrInfo::isBranchOffsetInRange(unsigned BranchOp,
     return isInt<21>(BrOffset);
   case RISCV::PseudoJump:
     return isInt<32>(SignExtend64(BrOffset + 0x800, XLen));
-  case RISCV::PseudoPBU:
-  case RISCV::PseudoPBC:
-  //case RISCV::PBAL: // TODO(mitch): this needed?
+  case RISCV::PseudoBREQ:
+  case RISCV::PseudoBRNE:
+  case RISCV::PseudoBRLT:
+  case RISCV::PseudoBRLTU:
+  case RISCV::PseudoBRGE:
+  case RISCV::PseudoBRGEU:
+  // TODO(non-spec,mitch): Don't think this is right..
     return true;
   }
 }
@@ -3596,7 +3586,6 @@ void RISCVInstrInfo::buildOutlinedFrame(
 MachineBasicBlock::iterator RISCVInstrInfo::insertOutlinedCall(
     Module &M, MachineBasicBlock &MBB, MachineBasicBlock::iterator &It,
     MachineFunction &MF, outliner::Candidate &C) const {
-  llvm_unreachable("TODO [non-spec]");
 
   if (C.CallConstructionID == MachineOutlinerTailCall) {
     It = MBB.insert(It, BuildMI(MF, DebugLoc(), get(RISCV::PseudoTAIL))

@@ -197,6 +197,7 @@ void RISCVNS::insertUnconditionalBranch(MachineBasicBlock& MBB,
                                              MachineInstr* MI,
                                              MachineBasicBlock* TargetBB,
                                              const char *SymbolName) {
+  llvm_unreachable("TODO: don't call this function");
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
   const DebugLoc DL = MI->getDebugLoc();
@@ -243,6 +244,7 @@ void RISCVNS::insertUnconditionalBranch(MachineBasicBlock& MBB,
                                              MachineBasicBlock* TargetBB,
                                              const char *SymbolName,
                                              int* BytesAdded) {
+  llvm_unreachable("TODO: don't call this function");
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
 
@@ -288,6 +290,7 @@ void RISCVNS::insertConditionalBranch(MachineBasicBlock& MBB,
                                            Register rs1,
                                            Register rs2,
                                            MachineBasicBlock* TargetBB) {
+  llvm_unreachable("TODO: don't call this function");
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
   const DebugLoc DL = MI->getDebugLoc();
@@ -339,6 +342,7 @@ void RISCVNS::insertConditionalBranch(MachineBasicBlock& MBB,
                                            Register rs2,
                                            MachineBasicBlock* TargetBB,
                                            int* BytesAdded) {
+  llvm_unreachable("TODO: don't call this function");
   MachineFunction *MF = MBB.getParent();
   const TargetInstrInfo *TII = MF->getSubtarget().getInstrInfo();
 
