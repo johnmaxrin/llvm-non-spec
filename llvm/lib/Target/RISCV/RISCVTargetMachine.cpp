@@ -153,6 +153,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVExpandAtomicPseudoPass(*PR);
   initializeRISCVExpandBranchPseudoPass(*PR);
   initializeRISCVRedundantCopyEliminationPass(*PR);
+  initializeRISCVBranchSupportAnalysisWrapperPass(*PR);
   initializeRISCVAsmPrinterPass(*PR);
 }
 
@@ -594,12 +595,14 @@ void RISCVPassConfig::addPreEmitPass2() {
   // progress in the LR/SC block.
   addPass(createRISCVExpandAtomicPseudoPass());
 
-  addPass(createRISCVExpandBranchPseudoPass());
+  // addPass(createRISCVExpandBranchPseudoPass());
 
   // KCFI indirect call checks are lowered to a bundle.
   addPass(createUnpackMachineBundles([&](const MachineFunction &MF) {
     return MF.getFunction().getParent()->getModuleFlag("kcfi");
   }));
+
+  addPass(createRISCVBranchSupportAnalysisPass());
 }
 
 void RISCVPassConfig::addMachineSSAOptimization() {

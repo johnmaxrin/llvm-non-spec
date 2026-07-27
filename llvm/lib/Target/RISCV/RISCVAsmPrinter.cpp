@@ -21,6 +21,7 @@
 #include "RISCVConstantPoolValue.h"
 #include "RISCVMachineFunctionInfo.h"
 #include "RISCVRegisterInfo.h"
+#include "RISCVBranchSupportAnalysis.h"
 #include "TargetInfo/RISCVTargetInfo.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Statistic.h"
@@ -62,6 +63,7 @@ public:
 
 private:
   const RISCVSubtarget *STI;
+  const RISCVBranchSupportInfo *BranchSupportInfo;
 
 public:
   explicit RISCVAsmPrinter(TargetMachine &TM,
@@ -69,6 +71,11 @@ public:
       : AsmPrinter(TM, std::move(Streamer), ID) {}
 
   StringRef getPassName() const override { return "RISC-V Assembly Printer"; }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AsmPrinter::getAnalysisUsage(AU);
+    AU.addRequired<RISCVBranchSupportAnalysisWrapper>();
+  }
 
   void LowerSTACKMAP(MCStreamer &OutStreamer, StackMaps &SM,
                      const MachineInstr &MI);
@@ -333,37 +340,18 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
   emitNTLHint(MI);
 
+  if (RISCVBranchSupport BS = BranchSupportInfo->Branches.lookup(MI)) {
+    MCSymbol *Sym = BS.S->getOperand(1).getMCSymbol();
+    OutStreamer->emitLabel(Sym);
+  }
+
   // Do any auto-generated pseudo lowerings.
   if (MCInst OutInst; lowerPseudoInstExpansion(MI, OutInst)) {
-    // NOTE(non-spec): Insert label to identify the location of PBAL instructions
-    if (OutInst.getOpcode() == RISCV::PBAL) {
-      MachineOperand Operand = MI->getOperand(1);
-      if (Operand.isMCSymbol()) {
-        OutStreamer->emitLabel(Operand.getMCSymbol());
-      }
-      else {
-        MCSymbol* Source = RISCVNS::getBranchSource(const_cast<MachineInstr*>(MI));
-        OutStreamer->emitLabel(Source);
-      }
-    }
     EmitToStreamer(*OutStreamer, OutInst);
     return;
   }
 
   switch (MI->getOpcode()) {
-  case RISCV::PBAL: {
-    if (MCSymbol* Source = RISCVNS::getBranchSource(const_cast<MachineInstr*>(MI)))
-      OutStreamer->emitLabel(Source);
-    break;
-  }
-  case RISCV::BMOVS_J: {
-    RISCVNS::fixBranchSource(const_cast<MachineInstr*>(MI));
-    break;
-  }
-  case RISCV::BMOVT_J: {
-    RISCVNS::fixBranchTarget(const_cast<MachineInstr*>(MI));
-    break;
-  }
   case RISCV::HWASAN_CHECK_MEMACCESS_SHORTGRANULES:
     LowerHWASAN_CHECK_MEMACCESS(*MI);
     return;
@@ -521,6 +509,8 @@ bool RISCVAsmPrinter::emitDirectiveOptionArch() {
 
 bool RISCVAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
   STI = &MF.getSubtarget<RISCVSubtarget>();
+  BranchSupportInfo = &getAnalysis<RISCVBranchSupportAnalysisWrapper>().getInfo();
+
   RISCVTargetStreamer &RTS =
       static_cast<RISCVTargetStreamer &>(*OutStreamer->getTargetStreamer());
 

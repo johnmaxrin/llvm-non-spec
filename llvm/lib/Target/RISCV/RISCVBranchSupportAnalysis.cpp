@@ -1,0 +1,223 @@
+//===-- RISCVBranchSupportAnalysis.cpp - Branch support analysis ----------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM
+// Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+#include "RISCVBranchSupportAnalysis.h"
+#include "RISCV.h"
+#include "RISCVInstrInfo.h"
+#include "RISCVSubtarget.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/Twine.h"
+#include "llvm/CodeGen/MachineFunction.h"
+#include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/TargetInstrInfo.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
+#include "llvm/InitializePasses.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
+
+using namespace llvm;
+
+#define DEBUG_TYPE "riscv-branch-support-analysis"
+
+//STATISTIC(NumFunctionsWithResidualPseudos,
+//          "Number of functions that still contained a pseudo instruction "
+//          "after RISCVExpandPseudoInsts/RISCVExpandAtomicPseudoInsts");
+
+/// When set, dump a one-line summary of RISCVBranchSupportInfo for every function,
+/// e.g. via `llc -riscv-print-branch-support-analysis`.
+static cl::opt<bool> PrintRISCVBranchSupportAnalysis(
+    "riscv-print-branch-support-analysis", cl::Hidden,
+    cl::desc("Print RISCVBranchSupportAnalysis results for every function"),
+    cl::init(false));
+
+/// When set, a residual (unexpanded) pseudo instruction found by this
+/// analysis is reported as a hard, fatal error instead of a warning. Useful
+/// to turn on in CI so an unexpanded pseudo fails the build loudly instead
+/// of silently reaching the AsmPrinter.
+//static cl::opt<bool> RISCVBranchSupportAnalysisStrict(
+//    "riscv-late-mir-analysis-strict", cl::Hidden,
+//    cl::desc("Treat residual pseudo instructions found by "
+//             "RISCVBranchSupportAnalysis as a fatal zerror"),
+//    cl::init(false));
+
+
+void RISCVBranchSupport::dump() const {
+  print(dbgs());
+  dbgs() << '\n';
+}
+void RISCVBranchSupport::print(raw_ostream &OS) const {
+  if (S) { OS << "*" << *S << "\n"; }
+  if (T) { OS << "*" << *T << "\n"; }
+  if (C) { OS << "*" << *C << "\n"; }
+}
+
+static RISCVBranchSupport FindBranchSupport(const MachineInstr &PBMI) {
+  RISCVBranchSupport Support = {};
+  const MachineBasicBlock *MBB = PBMI.getParent();
+  Register BR = PBMI.getOperand(0).getReg();
+
+  auto It = PBMI.getIterator();
+  while (It != MBB->begin()) {
+    --It;
+    const MachineInstr &I = *It;
+
+    if (!I.isBMOV())
+      continue;
+
+    switch (I.getOpcode()) {
+    case RISCV::BMOVS_I:
+    case RISCV::BMOVS_J:
+      if (!Support.S && I.getOperand(0).getReg() == BR) {
+        Support.S = &I;
+      }
+      break;
+    case RISCV::BMOVT_I:
+    case RISCV::BMOVT_J:
+      if (!Support.T && I.getOperand(0).getReg() == BR) {
+        Support.T = &I;
+      }
+      break;
+    case RISCV::BMOVC_BEQ:
+    case RISCV::BMOVC_BNE:
+    case RISCV::BMOVC_BLT:
+    case RISCV::BMOVC_BLTU:
+    case RISCV::BMOVC_BGE:
+    case RISCV::BMOVC_BGEU:
+    case RISCV::BMOVC_BITS:
+    case RISCV::BMOVC_LOOP:
+      if (!Support.C && I.getOperand(0).getReg() == BR) {
+        Support.C = &I;
+      }
+      break;
+    }
+
+    if (Support.S && Support.T)
+      break;
+  }
+
+  return Support;
+}
+
+/// Core, PM-agnostic traversal shared by the legacy wrapper pass and the
+/// new-PM analysis below.
+static RISCVBranchSupportInfo computeRISCVBranchSupportInfo(const MachineFunction &MF) {
+  RISCVBranchSupportInfo Info;
+  //const TargetSubtargetInfo &STI = MF.getSubtarget();
+  //const TargetInstrInfo *TII = STI.getInstrInfo();
+  //const TargetRegisterInfo *TRI = STI.getRegisterInfo();
+
+  for (const MachineBasicBlock &MBB : MF) {
+    for (const MachineInstr &MI : MBB) {
+      if (MI.isDebugInstr() || MI.isMetaInstruction())
+        continue;
+
+      switch (MI.getOpcode()) {
+      case RISCV::BMOVS_I:
+      case RISCV::BMOVS_J:
+        Info.NumBMOVS += 1;
+        break;
+      case RISCV::BMOVT_I:
+      case RISCV::BMOVT_J:
+        Info.NumBMOVT += 1;
+        break;
+      case RISCV::BMOVC_BEQ:
+      case RISCV::BMOVC_BNE:
+      case RISCV::BMOVC_BLT:
+      case RISCV::BMOVC_BLTU:
+      case RISCV::BMOVC_BGE:
+      case RISCV::BMOVC_BGEU:
+        Info.NumBMOVC += 1;
+        break;
+      case RISCV::PseudoPBU:
+      case RISCV::PseudoPBC:
+      case RISCV::PseudoPBI: {
+        Info.NumPB += 1;
+        RISCVBranchSupport Support = FindBranchSupport(MI);
+        auto [_, Inserted] = Info.Branches.try_emplace(&MI, Support);
+        assert(Inserted);
+        break;
+      }
+      default:
+        break;
+        // assert(MI.isPseudo() == false);
+      }
+    }
+  }
+
+  return Info;
+}
+
+void RISCVBranchSupportInfo::print(raw_ostream &OS, const MachineFunction &MF) const {
+  OS << "RISCVBranchSupportAnalysis for function '" << MF.getName() << "':\n"
+    << "  " << Branches.size() << " branches" << '\n'
+    << "  BMOVS:  " << NumBMOVS << " instructions" << '\n'
+    << "  BMOVT:  " << NumBMOVT << " instructions" << '\n'
+    << "  BMOVC:  " << NumBMOVC << " instructions" << '\n'
+    << "  PBAL:   " << NumPB << " instructions" << '\n';
+}
+
+//===----------------------------------------------------------------------===//
+// Legacy PassManager wrapper pass.
+//===----------------------------------------------------------------------===//
+
+char RISCVBranchSupportAnalysisWrapper::ID = 0;
+
+INITIALIZE_PASS(RISCVBranchSupportAnalysisWrapper,
+                "riscv-branch-support-analysis",
+                "RISC-V Branch Support Analysis", false, true)
+
+RISCVBranchSupportAnalysisWrapper::RISCVBranchSupportAnalysisWrapper()
+    : MachineFunctionPass(ID) {}
+
+bool RISCVBranchSupportAnalysisWrapper::runOnMachineFunction(
+    MachineFunction &MF) {
+  Info = computeRISCVBranchSupportInfo(MF);
+  if (PrintRISCVBranchSupportAnalysis)
+    Info.print(errs(), MF);
+  // This is a pure analysis: it never changes the MachineFunction.
+  return false;
+}
+
+void RISCVBranchSupportAnalysisWrapper::print(raw_ostream &OS,
+                                            const Module *) const {
+  // `print()` is invoked without a MachineFunction handle (see
+  // MachineFunctionPass::print / the -p / MIR pass-printing machinery), so
+  // we don't have a name to print here; dump the raw counters instead.
+  OS << __func__ << " was called\n";
+}
+
+FunctionPass *llvm::createRISCVBranchSupportAnalysisPass() {
+  return new RISCVBranchSupportAnalysisWrapper();
+}
+
+//===----------------------------------------------------------------------===//
+// New PassManager analysis + printer.
+//===----------------------------------------------------------------------===//
+
+AnalysisKey RISCVBranchSupportAnalysis::Key;
+
+RISCVBranchSupportAnalysis::Result
+RISCVBranchSupportAnalysis::run(MachineFunction &MF,
+                          MachineFunctionAnalysisManager &) {
+  RISCVBranchSupportInfo Info = computeRISCVBranchSupportInfo(MF);
+  if (PrintRISCVBranchSupportAnalysis)
+    Info.print(errs(), MF);
+  return Info;
+}
+
+PreservedAnalyses
+RISCVBranchSupportAnalysisPrinterPass::run(MachineFunction &MF,
+                                     MachineFunctionAnalysisManager &MFAM) {
+  MFAM.getResult<RISCVBranchSupportAnalysis>(MF).print(OS, MF);
+  return PreservedAnalyses::all();
+}

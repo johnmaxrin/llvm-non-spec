@@ -1041,8 +1041,6 @@ unsigned RISCVCC::getBrCond(RISCVCC::CondCode CC, unsigned SelectOpc) {
     switch (CC) {
     default:
       llvm_unreachable("Unexpected condition code!");
-      // TODO [non-spec]: This will almost certainly break things,
-      //                  so find everywhere this function is called!
     case RISCVCC::COND_EQ:
       return RISCV::PseudoBREQ;
     case RISCVCC::COND_NE:

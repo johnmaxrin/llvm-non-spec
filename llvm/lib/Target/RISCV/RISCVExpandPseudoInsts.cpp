@@ -350,11 +350,13 @@ bool RISCVExpandPseudo::expandBranch(MachineBasicBlock &MBB,
   Register BReg = RISCV::B0; // TODO: use virtual registers
   MachineBasicBlock *TBB = MBBI->getOperand(0).getMBB();
   DebugLoc DL = MBBI->getDebugLoc();
+  MCContext &Context = MBB.getParent()->getContext();
+  MCSymbol *Sym = Context.createTempSymbol("ns_j_");
 
   // Emit BMOVS B0, ns_j_
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BReg)
-      .addExternalSymbol("ns_j_");
+      .addSym(Sym);
 
   // Emit BMOVT B0, Target
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_J))
@@ -377,32 +379,33 @@ bool RISCVExpandPseudo::expandCondBranch(MachineBasicBlock &MBB,
   Register Rs2 = MBBI->getOperand(1).getReg();
   MachineBasicBlock *TBB = MBBI->getOperand(2).getMBB();
   DebugLoc DL = MBBI->getDebugLoc();
+  MCContext &Context = MBB.getParent()->getContext();
 
-  const char *Label = nullptr;
+  MCSymbol* Sym;
   unsigned Opcode = 0;
   switch (MBBI->getOpcode()) {
     case RISCV::PseudoBREQ:
-      Label = "ns_beq_";
+      Sym = Context.createTempSymbol("ns_beq_");
       Opcode = RISCV::BMOVC_BEQ;
     break;
     case RISCV::PseudoBRNE:
-      Label = "ns_bne_";
+      Sym = Context.createTempSymbol("ns_bne_");
       Opcode = RISCV::BMOVC_BNE;
     break;
   case RISCV::PseudoBRGE:
-    Label = "ns_bge_";
+    Sym = Context.createTempSymbol("ns_bge_");
     Opcode = RISCV::BMOVC_BGE;
     break;
   case RISCV::PseudoBRGEU:
-    Label = "ns_bgeu_";
+    Sym = Context.createTempSymbol("ns_bgeu_");
     Opcode = RISCV::BMOVC_BGEU;
     break;
   case RISCV::PseudoBRLT:
-    Label = "ns_blt_";
+    Sym = Context.createTempSymbol("ns_blt_");
     Opcode = RISCV::BMOVC_BLT;
     break;
   case RISCV::PseudoBRLTU:
-    Label = "ns_bltu_";
+    Sym = Context.createTempSymbol("ns_bltu_");
     Opcode = RISCV::BMOVC_BLTU;
     break;
     default:
@@ -412,7 +415,7 @@ bool RISCVExpandPseudo::expandCondBranch(MachineBasicBlock &MBB,
   // Emit BMOVS B0, ns_j_
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BReg)
-      .addExternalSymbol(Label);
+      .addSym(Sym);
 
   // Emit BMOVT B0, Target
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_J))
@@ -436,30 +439,31 @@ bool RISCVExpandPseudo::expandCondBranch(MachineBasicBlock &MBB,
 
 bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator MBBI) {
+  MCContext &Context = MBB.getParent()->getContext();
   MCInst TmpInst;
   const MachineOperand* Func = nullptr;
   MCRegister Ra;
-  const char* Label = nullptr;
+  MCSymbol* Sym;
   switch (MBBI->getOpcode()) {
     case RISCV::PseudoTAIL:
       Func = &MBBI->getOperand(0);
-      Label = "ns_tail_";
+      Sym = Context.createTempSymbol("ns_tail_");
       Ra = RISCVII::getTailExpandUseRegNo(STI->getFeatureBits());
     break;
     case RISCV::PseudoCALLReg:
       Func = &MBBI->getOperand(1);
       Ra = MBBI->getOperand(0).getReg();
-      Label = "ns_call_reg_";
+      Sym = Context.createTempSymbol("ns_call_reg_");
     break;
     case RISCV::PseudoCALL:
       Func = &MBBI->getOperand(0);
       Ra = RISCV::X1;
-      Label = "ns_call_";
+      Sym = Context.createTempSymbol("ns_call_");
     break;
     case RISCV::PseudoJump:
       Func = &MBBI->getOperand(1);
       Ra = MBBI->getOperand(0).getReg();
-      Label = "ns_jump_";
+      Sym = Context.createTempSymbol("ns_jump_");
     break;
   default:
     llvm_unreachable("invalid opcode");
@@ -471,7 +475,7 @@ bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
   // Emit BMOVS B0, Label
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BReg)
-      .addExternalSymbol(Label);
+      .addSym(Sym);
 
   // Emit AUIPC Ra, Func with R_RISCV_CALL relocation type.
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::AUIPC), Ra)
@@ -504,11 +508,13 @@ bool RISCVExpandPseudo::expandReturn(MachineBasicBlock &MBB,
                                      MachineBasicBlock::iterator MBBI) {
   Register BReg = RISCV::B0; // TODO: use virtual registers
   DebugLoc DL = MBBI->getDebugLoc();
+  MCContext &Context = MBB.getParent()->getContext();
+  MCSymbol* Sym = Context.createTempSymbol("ns_return_");
 
   // Emit BMOVS B0, ns_return_
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BReg)
-      .addExternalSymbol("ns_return_");
+      .addSym(Sym);
 
   // Emit BMOVT B0, Ra, 0
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_I))
@@ -531,11 +537,13 @@ bool RISCVExpandPseudo::expandIndirect(MachineBasicBlock &MBB,
   Register BReg = RISCV::B0;
   DebugLoc DL = MBBI->getDebugLoc();
   MCRegister Rs1 = MBBI->getOperand(0).getReg();
+  MCContext &Context = MBB.getParent()->getContext();
+  MCSymbol* Sym = Context.createTempSymbol("ns_indirect_");
 
   // Emit BMOVS B0, 8
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
       .addDef(BReg)
-      .addExternalSymbol("ns_indirect_");
+      .addSym(Sym);
 
   // Emit BMOVT B0, Rs1, 0
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_I))

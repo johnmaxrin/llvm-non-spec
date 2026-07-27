@@ -16,7 +16,7 @@
 
 using namespace llvm;
 
-// TODO: use `getCondFromBranchOpc`
+#if 0
 
 static const char* labelFromCC(RISCVCC::CondCode CC) {
   switch (CC) {
@@ -472,11 +472,13 @@ unsigned RISCVNS::removeBranchComplete(MachineInstr* PB, int *BytesRemoved) {
 MCSymbol* getBranchSourceHelper(MachineInstr *BMOVS) {
   MachineOperand& Operand = BMOVS->getOperand(1);
   if (Operand.isMCSymbol()) {
+    dbgs() << "Using existing MCSymbol\n";
     return BMOVS->getOperand(1).getMCSymbol();
   }
   if (Operand.isImm()) {
     return nullptr;
   }
+  dbgs() << "Creating Temp Symbol\n";
   const char* SymbolName = Operand.getSymbolName();
   BMOVS->removeOperand(1);
   MCContext &Context = BMOVS->getParent()->getParent()->getContext();
@@ -533,3 +535,5 @@ void RISCVNS::fixBranchTarget(MachineInstr *BMOVT) {
   }
   llvm_unreachable("[non-spec] :(");
 }
+
+#endif

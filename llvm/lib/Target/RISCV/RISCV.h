@@ -120,6 +120,9 @@ void initializeRISCVVMV0EliminationPass(PassRegistry &);
 FunctionPass* createRISCVExpandBranchPseudoPass();
 void initializeRISCVExpandBranchPseudoPass(PassRegistry &);
 
+FunctionPass *createRISCVBranchSupportAnalysisPass();
+void initializeRISCVBranchSupportAnalysisWrapperPass(PassRegistry &);
+
 void initializeRISCVAsmPrinterPass(PassRegistry &);
 } // namespace llvm
 
