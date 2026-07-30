@@ -2,6 +2,14 @@
 
 Non-speculative RISCV modification to the [LLVM Project](https://github.com/llvm/llvm-project).
 
+## Overview of changes
+- Added new BMOV/PBAL instructions to RISCV ISA
+- Removed tablegen instruction selection for Pseudo branch instructions
+- Added Pseudo branch instruction expansion after optimizations
+	- See RISCVExpandPseudoInsts.cpp
+- Added Branch Support Analysis pass (used to emit PBAL labels)
+	- See RISCVBranchSupportAnalysis.{h,cpp} and RISCVAsmPrinter.cpp
+
 ## My CMake Setup
 ```bash
 -G Ninja
@@ -11,19 +19,23 @@ Non-speculative RISCV modification to the [LLVM Project](https://github.com/llvm
 "-DLLVM_ENABLE_PROJECTS=clang;lld"
 -DLLVM_TARGETS_TO_BUILD=RISCV
 -DLLVM_DEFAULT_TARGET_TRIPLE=riscv64-unknown-linux-gnu
--DLLVM_ENABLE_LLD=ON
--DLLVM_LIBC_FULL_BUILD=ON
 -DCLANG_DEFAULT_RTLIB=compiler-rt
--DCLANG_DEFAULT_UNWINDLIB=libunwind
--DCLANG_DEFAULT_C_STDLIB=libc
--DCLANG_DEFAULT_CXX_STDLIB=libc++
 -DCLANG_DEFAULT_LINKER=lld
--DLLVM_RUNTIME_TARGETS=riscv64-linux-gnu
+-DCLANG_DEFAULT_CXX_STDLIB=libc++
+-DCLANG_DEFAULT_UNWINDLIB=libunwind
+-DLLVM_RUNTIME_TARGETS=riscv64-unknown-linux-gnu
 "-DLLVM_ENABLE_RUNTIMES=compiler-rt;libunwind;libc;libcxx;libcxxabi"
--DRUNTIMES_riscv64-linux-gnu_LLVM_LIBC_FULL_BUILD=ON
--DRUNTIMES_riscv64-linux-gnu_LIBC_TARGET_TRIPLE=riscv64-unknown-linux-gnu
--DRUNTIMES_riscv64-linux-gnu_LIBC_KERNEL_HEADERS=/home/mitchell/riscv-kernel-headers/include
-"-DRUNTIMES_riscv64-linux-gnu_LLVM_ENABLE_RUNTIMES=compiler-rt;libunwind;libc;libcxx;libcxxabi"
+-DRUNTIMES_riscv64-unknown-linux-gnu_LIBUNWIND_USE_COMPILER_RT=ON
+-DRUNTIMES_riscv64-unknown-linux-gnu_LIBUNWIND_ENABLE_SHARED=OFF
+-DRUNTIMES_riscv64-unknown-linux-gnu_LIBCXXABI_ENABLE_SHARED=OFF
+-DRUNTIMES_riscv64-unknown-linux-gnu_LIBCXX_ENABLE_SHARED=OFF
+-DRUNTIMES_riscv64-unknown-linux-gnu_LIBC_KERNEL_HEADERS=/home/mitchell/riscv-kernel-headers/include
+"-DRUNTIMES_riscv64-unknown-linux-gnu_LLVM_ENABLE_RUNTIMES=compiler-rt;libunwind;libc;libcxx;libcxxabi"
+-DRUNTIMES_riscv64-unknown-linux-gnu_LLVM_INCLUDE_TESTS=OFF
+-DRUNTIMES_riscv64-unknown-linux-gnu_COMPILER_RT_BUILD_SANITIZERS=OFF
+-DRUNTIMES_riscv64-unknown-linux-gnu_COMPILER_RT_BUILD_XRAY=OFF
+-DRUNTIMES_riscv64-unknown-linux-gnu_COMPILER_RT_BUILD_LIBFUZZER=OFF
+-DRUNTIMES_riscv64-unknown-linux-gnu_COMPILER_RT_BUILD_MEMPROF=OFF
 ```
 
 ## How to Build

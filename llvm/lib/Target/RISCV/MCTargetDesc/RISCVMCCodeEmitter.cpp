@@ -151,6 +151,10 @@ static void addFixup(SmallVectorImpl<MCFixup> &Fixups, uint32_t Offset,
   Fixups.push_back(MCFixup::create(Offset, Value, Kind, PCRel));
 }
 
+#define WRITE(MCI) \
+  Binary = getBinaryCodeForInstr(MCI, Fixups, STI); \
+  support::endian::write(CB, Binary, llvm::endianness::little)
+
 // Expand PseudoCALL(Reg), PseudoTAIL and PseudoJump to AUIPC and JALR with
 // relocation types. We expand those pseudo-instructions while encoding them,
 // meaning AUIPC and JALR won't go through RISC-V MC to MC compressed
@@ -163,7 +167,6 @@ void RISCVMCCodeEmitter::expandFunctionCall(const MCInst &MI,
                                             SmallVectorImpl<char> &CB,
                                             SmallVectorImpl<MCFixup> &Fixups,
                                             const MCSubtargetInfo &STI) const {
-  MCInst TmpInst;
   MCOperand Func;
   MCRegister Ra;
   if (MI.getOpcode() == RISCV::PseudoTAIL) {
@@ -185,38 +188,22 @@ void RISCVMCCodeEmitter::expandFunctionCall(const MCInst &MI,
 
   const MCExpr *CallExpr = Func.getExpr();
 
-  // Emit AUIPC Ra, Func with R_RISCV_CALL relocation type.
-  TmpInst = MCInstBuilder(RISCV::AUIPC).addReg(Ra).addExpr(CallExpr);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
-
-  // Emit BMOVT B0, Ra, 0
-  TmpInst = MCInstBuilder(RISCV::BMOVT_I).addReg(RISCV::B0).addReg(Ra).addImm(0);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
-
-  // Emit BMOVS B0, 8
-  TmpInst = MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
-
-  // Emit BMOVC_BEQ B0, ZERO, ZERO
-  TmpInst = MCInstBuilder(RISCV::BMOVC_BEQ).addReg(RISCV::B0).addReg(RISCV::X0).addReg(RISCV::X0);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
+  WRITE(MCInstBuilder(RISCV::AUIPC).addReg(Ra).addExpr(CallExpr));
+  WRITE(MCInstBuilder(RISCV::BMOVT_I)
+    .addReg(RISCV::B0).addReg(Ra).addImm(0));
+  WRITE(MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8));
+  // TODO: [Non-Spec] This is a limitation of the current Gem5 implementation
+  WRITE(MCInstBuilder(RISCV::BMOVC_BEQ)
+    .addReg(RISCV::B0).addReg(RISCV::X0).addReg(RISCV::X0));
 
   if (MI.getOpcode() == RISCV::PseudoTAIL ||
       MI.getOpcode() == RISCV::PseudoJump) {
-    // Emit PBAL (JALR X0, Ra, 0)
-    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0).addExpr(CallExpr);
-    Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-    support::endian::write(CB, Binary, llvm::endianness::little);
+    WRITE(MCInstBuilder(RISCV::PBAL)
+      .addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0));
   }
   else {
-    // Emit PBAL (JALR Ra, Ra, 0)
-    TmpInst = MCInstBuilder(RISCV::PBAL).addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0).addExpr(CallExpr);
-    Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-    support::endian::write(CB, Binary, llvm::endianness::little);
+    WRITE(MCInstBuilder(RISCV::PBAL)
+      .addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0));
   }
 }
 
@@ -224,20 +211,12 @@ void RISCVMCCodeEmitter::expandReturn(const MCInst &MI,
                                       SmallVectorImpl<char> &CB,
                                       SmallVectorImpl<MCFixup> &Fixups,
                                       const MCSubtargetInfo &STI) const {
-  // Emit BMOVS B0, 8
-  MCInst TmpInst = MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8);
-  uint32_t Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
-
-  // Emit BMOVT B0, Ra, 0
-  TmpInst = MCInstBuilder(RISCV::BMOVT_I).addReg(RISCV::B0).addReg(RISCV::X1).addImm(0);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
-
-  // Emit PBAL (JALR X0, Ra, 0)
-  TmpInst = MCInstBuilder(RISCV::PBAL).addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
+  uint32_t Binary;
+  WRITE(MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8));
+  WRITE(MCInstBuilder(RISCV::BMOVT_I)
+    .addReg(RISCV::B0).addReg(RISCV::X1).addImm(0));
+  WRITE(MCInstBuilder(RISCV::PBAL)
+    .addReg(RISCV::X0).addReg(RISCV::B0).addReg(RISCV::X0));
 }
 
 void RISCVMCCodeEmitter::expandIndirect(const MCInst &MI,
@@ -245,23 +224,16 @@ void RISCVMCCodeEmitter::expandIndirect(const MCInst &MI,
                                         SmallVectorImpl<MCFixup> &Fixups,
                                         const MCSubtargetInfo &STI,
                                         MCRegister Ra) const {
-  // JALR X1, GPR:$rs1, 0
+  llvm_unreachable("non-spec: indirect calls should have been expanded earlier");
+
   MCRegister Rs1 = MI.getOperand(0).getReg();
+  uint32_t Binary;
 
-  // Emit BMOVS B0, 8
-  MCInst TmpInst = MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8);
-  uint32_t Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
-
-  // Emit BMOVT B0, Rs1, 0
-  TmpInst = MCInstBuilder(RISCV::BMOVT_I).addReg(RISCV::B0).addReg(Rs1).addImm(0);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
-
-  // Emit PBAL B0, RA
-  TmpInst = MCInstBuilder(RISCV::PBAL).addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0);
-  Binary = getBinaryCodeForInstr(TmpInst, Fixups, STI);
-  support::endian::write(CB, Binary, llvm::endianness::little);
+  WRITE(MCInstBuilder(RISCV::BMOVS_J).addReg(RISCV::B0).addImm(8));
+  WRITE(MCInstBuilder(RISCV::BMOVT_I)
+    .addReg(RISCV::B0).addReg(Rs1).addImm(0));
+  WRITE(MCInstBuilder(RISCV::PBAL)
+    .addReg(Ra).addReg(RISCV::B0).addReg(RISCV::X0));
 }
 
 void RISCVMCCodeEmitter::expandTLSDESCCall(const MCInst &MI,
@@ -320,22 +292,16 @@ static unsigned getInvertedBranchOp(unsigned BrOp) {
   default:
     llvm_unreachable("Unexpected branch opcode!");
   case RISCV::PseudoLongBEQ:
-      llvm_unreachable("TODO [non-spec]");
     return RISCV::BNE;
   case RISCV::PseudoLongBNE:
-      llvm_unreachable("TODO [non-spec]");
     return RISCV::BEQ;
   case RISCV::PseudoLongBLT:
-      llvm_unreachable("TODO [non-spec]");
     return RISCV::BGE;
   case RISCV::PseudoLongBGE:
-      llvm_unreachable("TODO [non-spec]");
     return RISCV::BLT;
   case RISCV::PseudoLongBLTU:
-      llvm_unreachable("TODO [non-spec]");
     return RISCV::BGEU;
   case RISCV::PseudoLongBGEU:
-      llvm_unreachable("TODO [non-spec]");
     return RISCV::BLTU;
   case RISCV::PseudoLongQC_BEQI:
     return RISCV::QC_BNEI;
@@ -370,8 +336,7 @@ void RISCVMCCodeEmitter::expandLongCondBr(const MCInst &MI,
                                           SmallVectorImpl<char> &CB,
                                           SmallVectorImpl<MCFixup> &Fixups,
                                           const MCSubtargetInfo &STI) const {
-  // TODO(non-spec): replace jumps with PBAL
-  llvm_unreachable("Non-Spec TODO, lond cond br");
+  llvm_unreachable("TODO: [Non-Spec] lond cond br");
   MCRegister SrcReg1 = MI.getOperand(0).getReg();
   MCRegister SrcReg2 = MI.getOperand(1).getReg();
   MCOperand SrcSymbol = MI.getOperand(2);
@@ -431,6 +396,7 @@ void RISCVMCCodeEmitter::expandQCLongCondBrImm(const MCInst &MI,
                                                SmallVectorImpl<MCFixup> &Fixups,
                                                const MCSubtargetInfo &STI,
                                                unsigned Size) const {
+  llvm_unreachable("TODO: [Non-Spec] lond cond br");
   MCRegister SrcReg1 = MI.getOperand(0).getReg();
   auto BrImm = MI.getOperand(1).getImm();
   MCOperand SrcSymbol = MI.getOperand(2);
