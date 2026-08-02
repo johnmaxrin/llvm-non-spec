@@ -447,8 +447,8 @@ bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
   switch (MBBI->getOpcode()) {
     case RISCV::PseudoTAIL:
       Func = &MBBI->getOperand(0);
-      Sym = Context.createTempSymbol("ns_tail_");
       Ra = RISCVII::getTailExpandUseRegNo(STI->getFeatureBits());
+      Sym = Context.createTempSymbol("ns_tail_");
     break;
     case RISCV::PseudoCALLReg:
       Func = &MBBI->getOperand(1);
@@ -489,15 +489,14 @@ bool RISCVExpandPseudo::expandCall(MachineBasicBlock &MBB,
 
   if (MBBI->getOpcode() == RISCV::PseudoTAIL ||
       MBBI->getOpcode() == RISCV::PseudoJump) {
-    // Emit PBAL (JALR X0, Ra, 0)
-    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBU))
-        .addReg(BReg)->addOperand(*Func);
+    // Emit ~ JALR X0, Ra, 0
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBCALL))
+        .addReg(BReg).addReg(RISCV::X0);
   }
   else {
-    // Emit PBAL (JALR Ra, Ra, 0)
-    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBI))
-        .addReg(BReg)
-        .addReg(Ra);
+    // Emit ~ JALR Ra, Ra, 0
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBCALL))
+        .addReg(BReg).addReg(Ra);
   }
 
   MBBI->eraseFromParent();

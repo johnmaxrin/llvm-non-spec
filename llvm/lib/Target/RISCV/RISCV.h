@@ -117,11 +117,11 @@ void initializeRISCVVLOptimizerPass(PassRegistry &);
 FunctionPass *createRISCVVMV0EliminationPass();
 void initializeRISCVVMV0EliminationPass(PassRegistry &);
 
-FunctionPass* createRISCVExpandBranchPseudoPass();
-void initializeRISCVExpandBranchPseudoPass(PassRegistry &);
+FunctionPass* createRISCVBranchSetupHoistingPass();
+void initializeRISCVBranchSetupHoistingPass(PassRegistry &);
 
-FunctionPass *createRISCVBranchSupportAnalysisPass();
-void initializeRISCVBranchSupportAnalysisWrapperPass(PassRegistry &);
+FunctionPass *createRISCVBranchSetupAnalysisPass();
+void initializeRISCVBranchSetupAnalysisWrapperPass(PassRegistry &);
 
 void initializeRISCVAsmPrinterPass(PassRegistry &);
 } // namespace llvm

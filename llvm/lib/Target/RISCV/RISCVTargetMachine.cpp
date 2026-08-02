@@ -151,9 +151,9 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVIndirectBranchTrackingPass(*PR);
   initializeRISCVLoadStoreOptPass(*PR);
   initializeRISCVExpandAtomicPseudoPass(*PR);
-  initializeRISCVExpandBranchPseudoPass(*PR);
+  initializeRISCVBranchSetupHoistingPass(*PR);
   initializeRISCVRedundantCopyEliminationPass(*PR);
-  initializeRISCVBranchSupportAnalysisWrapperPass(*PR);
+  initializeRISCVBranchSetupAnalysisWrapperPass(*PR);
   initializeRISCVAsmPrinterPass(*PR);
 }
 
@@ -602,7 +602,7 @@ void RISCVPassConfig::addPreEmitPass2() {
     return MF.getFunction().getParent()->getModuleFlag("kcfi");
   }));
 
-  addPass(createRISCVBranchSupportAnalysisPass());
+  addPass(createRISCVBranchSetupHoistingPass());
 }
 
 void RISCVPassConfig::addMachineSSAOptimization() {

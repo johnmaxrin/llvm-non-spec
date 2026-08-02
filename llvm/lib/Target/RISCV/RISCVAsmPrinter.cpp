@@ -21,7 +21,7 @@
 #include "RISCVConstantPoolValue.h"
 #include "RISCVMachineFunctionInfo.h"
 #include "RISCVRegisterInfo.h"
-#include "RISCVBranchSupportAnalysis.h"
+#include "RISCVBranchSetupAnalysis.h"
 #include "TargetInfo/RISCVTargetInfo.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Statistic.h"
@@ -63,7 +63,7 @@ public:
 
 private:
   const RISCVSubtarget *STI;
-  const RISCVBranchSupportInfo *BranchSupportInfo;
+  const RISCVBranchSetupInfo *BranchSupportInfo;
 
 public:
   explicit RISCVAsmPrinter(TargetMachine &TM,
@@ -74,7 +74,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AsmPrinter::getAnalysisUsage(AU);
-    AU.addRequired<RISCVBranchSupportAnalysisWrapper>();
+    AU.addRequired<RISCVBranchSetupAnalysisWrapper>();
   }
 
   void LowerSTACKMAP(MCStreamer &OutStreamer, StackMaps &SM,
@@ -340,7 +340,7 @@ void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
 
   emitNTLHint(MI);
 
-  if (RISCVBranchSupport BS = BranchSupportInfo->Branches.lookup(MI)) {
+  if (RISCVBranchSetup BS = BranchSupportInfo->Branches.lookup(MI)) {
     MCSymbol *Sym = BS.S->getOperand(1).getMCSymbol();
     OutStreamer->emitLabel(Sym);
   }
@@ -509,7 +509,7 @@ bool RISCVAsmPrinter::emitDirectiveOptionArch() {
 
 bool RISCVAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
   STI = &MF.getSubtarget<RISCVSubtarget>();
-  BranchSupportInfo = &getAnalysis<RISCVBranchSupportAnalysisWrapper>().getInfo();
+  BranchSupportInfo = &getAnalysis<RISCVBranchSetupAnalysisWrapper>().getInfo();
 
   RISCVTargetStreamer &RTS =
       static_cast<RISCVTargetStreamer &>(*OutStreamer->getTargetStreamer());
