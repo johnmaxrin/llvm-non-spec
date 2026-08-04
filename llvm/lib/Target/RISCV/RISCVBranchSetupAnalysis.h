@@ -1,4 +1,4 @@
-//===-- RISCVBranchSupportAnalysis.cpp - Branch support analysis ----------===//
+//===-- RISCVBranchSetupAnalysis.cpp - Branch setup analysis --------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM
 // Exceptions.
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file declares RISCVBranchSupportAnalysis, a read-only MachineFunction
+// This file declares RISCVBranchSetupAnalysis, a read-only MachineFunction
 // analysis meant to run at the very end of the RISC-V backend pipeline,
 // after both RISCVExpandPseudoInsts and RISCVExpandAtomicPseudoInsts have
 // run. At that point every remaining MachineInstr should be a "real" (i.e.
@@ -20,11 +20,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIB_TARGET_RISCV_RISCVBRANCHSUPPORTANALYSIS_H
-#define LLVM_LIB_TARGET_RISCV_RISCVBRANCHSUPPORTANALYSIS_H
+#ifndef LLVM_LIB_TARGET_RISCV_RISCVBRANCHSETUPANALYSIS_H
+#define LLVM_LIB_TARGET_RISCV_RISCVBRANCHSETUPANALYSIS_H
 
 #include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/CodeGen/MachinePassManager.h"
 
 namespace llvm {
 
@@ -32,7 +31,7 @@ class MachineFunction;
 class Module;
 class raw_ostream;
 
-struct RISCVBranchSupport {
+struct RISCVBranchSetup {
   const MachineInstr *S; // Source
   const MachineInstr *T; // Target
   const MachineInstr *C; // Condition (optional)
@@ -42,36 +41,38 @@ struct RISCVBranchSupport {
   void print(raw_ostream &OS) const;
 };
 
-struct RISCVBranchSupportInfo {
+struct RISCVBranchSetupInfo {
   unsigned NumBMOVS = 0;
   unsigned NumBMOVT = 0;
   unsigned NumBMOVC = 0;
   unsigned NumPB = 0;
 
-  DenseMap<const MachineInstr*, RISCVBranchSupport> Branches;
+  DenseMap<const MachineInstr*, RISCVBranchSetup> Branches;
 
   void print(raw_ostream &OS, const MachineFunction &MF) const;
+  void dump(const MachineFunction &MF) const;
 };
 
 /// Legacy PassManager wrapper. Other legacy-PM passes that run after this
 /// one in the pipeline can retrieve the cached result with:
 ///
 ///   void getAnalysisUsage(AnalysisUsage &AU) const override {
-///     AU.addRequired<RISCVBranchSupportAnalysisWrapper>();
+///     AU.addRequired<RISCVBranchSetupAnalysisWrapper>();
 ///     AU.setPreservesAll();
 ///   }
 ///   ...
-///   const RISCVBranchSupportInfo &Info =
-///       getAnalysis<RISCVBranchSupportAnalysisWrapper>().getInfo();
-class RISCVBranchSupportAnalysisWrapper : public MachineFunctionPass {
-  RISCVBranchSupportInfo Info;
+///   const RISCVBranchSetupInfo &Info =
+///       getAnalysis<RISCVBranchSetupAnalysisWrapper>().getInfo();
+class RISCVBranchSetupAnalysisWrapper : public MachineFunctionPass {
+  RISCVBranchSetupInfo Info;
 
 public:
   static char ID;
 
-  RISCVBranchSupportAnalysisWrapper();
+  RISCVBranchSetupAnalysisWrapper();
 
-  const RISCVBranchSupportInfo &getInfo() const { return Info; }
+  RISCVBranchSetupInfo &getInfo() { return Info; }
+  const RISCVBranchSetupInfo &getInfo() const { return Info; }
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
@@ -80,40 +81,40 @@ public:
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
-  void releaseMemory() override { Info = RISCVBranchSupportInfo(); }
+  void releaseMemory() override { Info = RISCVBranchSetupInfo(); }
 
   void print(raw_ostream &OS, const Module *M = nullptr) const override;
 
   StringRef getPassName() const override {
-    return "RISC-V Branch Support Analysis";
+    return "RISC-V Branch Setup Analysis";
   }
 };
 
 /// New-PM analysis, exposed for tools/pipelines that build a
 /// MachineFunctionAnalysisManager directly. NOTE: as of LLVM 21 the in-tree
 /// `llc` RISC-V pipeline is still driven by the legacy TargetPassConfig
-/// (RISCVPassConfig), so RISCVBranchSupportAnalysisWrapper above is what
+/// (RISCVPassConfig), so RISCVBranchSetupAnalysisWrapper above is what
 /// actually runs for ordinary `llc`/`RISCVTargetMachine` codegen. This
 /// class is provided so the same analysis logic is available to any
 /// MIR new-PM based driver without duplicating the traversal code.
-class RISCVBranchSupportAnalysis : public AnalysisInfoMixin<RISCVBranchSupportAnalysis> {
-  friend AnalysisInfoMixin<RISCVBranchSupportAnalysis>;
+class RISCVBranchSetupAnalysis : public AnalysisInfoMixin<RISCVBranchSetupAnalysis> {
+  friend AnalysisInfoMixin<RISCVBranchSetupAnalysis>;
   static AnalysisKey Key;
 
 public:
-  using Result = RISCVBranchSupportInfo;
+  using Result = RISCVBranchSetupInfo;
 
   Result run(MachineFunction &MF, MachineFunctionAnalysisManager &MFAM);
 };
 
 /// New-PM printer, usable as `-passes=print<riscv-branch-support>` by tools
 /// that wire up the MIR new-PM pipeline.
-class RISCVBranchSupportAnalysisPrinterPass
-    : public PassInfoMixin<RISCVBranchSupportAnalysisPrinterPass> {
+class RISCVBranchSetupAnalysisPrinterPass
+    : public PassInfoMixin<RISCVBranchSetupAnalysisPrinterPass> {
   raw_ostream &OS;
 
 public:
-  explicit RISCVBranchSupportAnalysisPrinterPass(raw_ostream &OS) : OS(OS) {}
+  explicit RISCVBranchSetupAnalysisPrinterPass(raw_ostream &OS) : OS(OS) {}
 
   PreservedAnalyses run(MachineFunction &MF,
                         MachineFunctionAnalysisManager &MFAM);

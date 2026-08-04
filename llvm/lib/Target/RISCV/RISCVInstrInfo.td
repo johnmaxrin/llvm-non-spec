@@ -1807,6 +1807,10 @@ let isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1, mayLoad
 def PseudoPBI : Pseudo<(outs), (ins PBR:$rs1, GPRJALR:$dst), []>,
                 PseudoInstExpansion<(PBAL GPR:$dst, PBR:$rs1, X0)>;
 
+let isCall = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 1 in
+def PseudoPBCALL : Pseudo<(outs), (ins PBR:$rs1, GPRJALR:$dst), []>,
+                   PseudoInstExpansion<(PBAL GPR:$dst, PBR:$rs1, X0)>;
+
 let isCall = 1, Defs = [X1], isCodeGenOnly = 0, Size = 16 in
 def PseudoCALL : Pseudo<(outs), (ins call_symbol:$func), [],
                         "call", "$func">, Sched<[WriteIALU, WriteJalr, ReadJalr]>;

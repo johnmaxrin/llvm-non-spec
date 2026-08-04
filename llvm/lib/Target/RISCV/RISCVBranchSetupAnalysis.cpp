@@ -1,4 +1,4 @@
-//===-- RISCVBranchSupportAnalysis.cpp - Branch support analysis ----------===//
+//===-- RISCVBranchSetupAnalysis.cpp - Branch support analysis ----------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM
 // Exceptions.
@@ -7,22 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "RISCVBranchSupportAnalysis.h"
-#include "RISCV.h"
-#include "RISCVInstrInfo.h"
+#include "RISCVBranchSetupAnalysis.h"
 #include "RISCVSubtarget.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/Twine.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
-#include "llvm/CodeGen/TargetRegisterInfo.h"
-#include "llvm/CodeGen/TargetSubtargetInfo.h"
-#include "llvm/InitializePasses.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -33,36 +25,36 @@ using namespace llvm;
 //          "Number of functions that still contained a pseudo instruction "
 //          "after RISCVExpandPseudoInsts/RISCVExpandAtomicPseudoInsts");
 
-/// When set, dump a one-line summary of RISCVBranchSupportInfo for every function,
+/// When set, dump a one-line summary of RISCVBranchSetupInfo for every function,
 /// e.g. via `llc -riscv-print-branch-support-analysis`.
-static cl::opt<bool> PrintRISCVBranchSupportAnalysis(
+static cl::opt<bool> PrintRISCVBranchSetupAnalysis(
     "riscv-print-branch-support-analysis", cl::Hidden,
-    cl::desc("Print RISCVBranchSupportAnalysis results for every function"),
+    cl::desc("Print RISCVBranchSetupAnalysis results for every function"),
     cl::init(false));
 
 /// When set, a residual (unexpanded) pseudo instruction found by this
 /// analysis is reported as a hard, fatal error instead of a warning. Useful
 /// to turn on in CI so an unexpanded pseudo fails the build loudly instead
 /// of silently reaching the AsmPrinter.
-//static cl::opt<bool> RISCVBranchSupportAnalysisStrict(
+//static cl::opt<bool> RISCVBranchSetupAnalysisStrict(
 //    "riscv-late-mir-analysis-strict", cl::Hidden,
 //    cl::desc("Treat residual pseudo instructions found by "
-//             "RISCVBranchSupportAnalysis as a fatal zerror"),
+//             "RISCVBranchSetupAnalysis as a fatal zerror"),
 //    cl::init(false));
 
 
-void RISCVBranchSupport::dump() const {
+void RISCVBranchSetup::dump() const {
   print(dbgs());
   dbgs() << '\n';
 }
-void RISCVBranchSupport::print(raw_ostream &OS) const {
+void RISCVBranchSetup::print(raw_ostream &OS) const {
   if (S) { OS << "*" << *S << "\n"; }
   if (T) { OS << "*" << *T << "\n"; }
   if (C) { OS << "*" << *C << "\n"; }
 }
 
-static RISCVBranchSupport FindBranchSupport(const MachineInstr &PBMI) {
-  RISCVBranchSupport Support = {};
+static RISCVBranchSetup FindBranchSetup(const MachineInstr &PBMI) {
+  RISCVBranchSetup Setup = {};
   const MachineBasicBlock *MBB = PBMI.getParent();
   Register BR = PBMI.getOperand(0).getReg();
 
@@ -77,14 +69,14 @@ static RISCVBranchSupport FindBranchSupport(const MachineInstr &PBMI) {
     switch (I.getOpcode()) {
     case RISCV::BMOVS_I:
     case RISCV::BMOVS_J:
-      if (!Support.S && I.getOperand(0).getReg() == BR) {
-        Support.S = &I;
+      if (!Setup.S && I.getOperand(0).getReg() == BR) {
+        Setup.S = &I;
       }
       break;
     case RISCV::BMOVT_I:
     case RISCV::BMOVT_J:
-      if (!Support.T && I.getOperand(0).getReg() == BR) {
-        Support.T = &I;
+      if (!Setup.T && I.getOperand(0).getReg() == BR) {
+        Setup.T = &I;
       }
       break;
     case RISCV::BMOVC_BEQ:
@@ -95,23 +87,23 @@ static RISCVBranchSupport FindBranchSupport(const MachineInstr &PBMI) {
     case RISCV::BMOVC_BGEU:
     case RISCV::BMOVC_BITS:
     case RISCV::BMOVC_LOOP:
-      if (!Support.C && I.getOperand(0).getReg() == BR) {
-        Support.C = &I;
+      if (!Setup.C && I.getOperand(0).getReg() == BR) {
+        Setup.C = &I;
       }
       break;
     }
 
-    if (Support.S && Support.T)
+    if (Setup.S && Setup.T)
       break;
   }
 
-  return Support;
+  return Setup;
 }
 
 /// Core, PM-agnostic traversal shared by the legacy wrapper pass and the
 /// new-PM analysis below.
-static RISCVBranchSupportInfo computeRISCVBranchSupportInfo(const MachineFunction &MF) {
-  RISCVBranchSupportInfo Info;
+static RISCVBranchSetupInfo computeRISCVBranchSetupInfo(const MachineFunction &MF) {
+  RISCVBranchSetupInfo Info;
   //const TargetSubtargetInfo &STI = MF.getSubtarget();
   //const TargetInstrInfo *TII = STI.getInstrInfo();
   //const TargetRegisterInfo *TRI = STI.getRegisterInfo();
@@ -138,12 +130,13 @@ static RISCVBranchSupportInfo computeRISCVBranchSupportInfo(const MachineFunctio
       case RISCV::BMOVC_BGEU:
         Info.NumBMOVC += 1;
         break;
+      case RISCV::PseudoPBCALL:
       case RISCV::PseudoPBU:
       case RISCV::PseudoPBC:
       case RISCV::PseudoPBI: {
         Info.NumPB += 1;
-        RISCVBranchSupport Support = FindBranchSupport(MI);
-        auto [_, Inserted] = Info.Branches.try_emplace(&MI, Support);
+        RISCVBranchSetup Setup = FindBranchSetup(MI);
+        auto [_, Inserted] = Info.Branches.try_emplace(&MI, Setup);
         assert(Inserted);
         break;
       }
@@ -157,38 +150,45 @@ static RISCVBranchSupportInfo computeRISCVBranchSupportInfo(const MachineFunctio
   return Info;
 }
 
-void RISCVBranchSupportInfo::print(raw_ostream &OS, const MachineFunction &MF) const {
-  OS << "RISCVBranchSupportAnalysis for function '" << MF.getName() << "':\n"
-    << "  " << Branches.size() << " branches" << '\n'
-    << "  BMOVS:  " << NumBMOVS << " instructions" << '\n'
+void RISCVBranchSetupInfo::print(raw_ostream &OS, const MachineFunction &MF) const {
+  OS << "RISCVBranchSetupAnalysis for function '" << MF.getName() << "':\n";
+    //<< "  " << Branches.size() << " branches" << '\n'
+  for (auto& B : Branches) {
+    B.getFirst()->print(OS);
+  }
+  OS << "  BMOVS:  " << NumBMOVS << " instructions" << '\n'
     << "  BMOVT:  " << NumBMOVT << " instructions" << '\n'
     << "  BMOVC:  " << NumBMOVC << " instructions" << '\n'
     << "  PBAL:   " << NumPB << " instructions" << '\n';
+}
+
+void RISCVBranchSetupInfo::dump(const MachineFunction &MF) const {
+  print(dbgs(), MF);
 }
 
 //===----------------------------------------------------------------------===//
 // Legacy PassManager wrapper pass.
 //===----------------------------------------------------------------------===//
 
-char RISCVBranchSupportAnalysisWrapper::ID = 0;
+char RISCVBranchSetupAnalysisWrapper::ID = 0;
 
-INITIALIZE_PASS(RISCVBranchSupportAnalysisWrapper,
+INITIALIZE_PASS(RISCVBranchSetupAnalysisWrapper,
                 "riscv-branch-support-analysis",
-                "RISC-V Branch Support Analysis", false, true)
+                "RISC-V Branch Setup Analysis", false, true)
 
-RISCVBranchSupportAnalysisWrapper::RISCVBranchSupportAnalysisWrapper()
+RISCVBranchSetupAnalysisWrapper::RISCVBranchSetupAnalysisWrapper()
     : MachineFunctionPass(ID) {}
 
-bool RISCVBranchSupportAnalysisWrapper::runOnMachineFunction(
+bool RISCVBranchSetupAnalysisWrapper::runOnMachineFunction(
     MachineFunction &MF) {
-  Info = computeRISCVBranchSupportInfo(MF);
-  if (PrintRISCVBranchSupportAnalysis)
+  Info = computeRISCVBranchSetupInfo(MF);
+  if (PrintRISCVBranchSetupAnalysis)
     Info.print(errs(), MF);
   // This is a pure analysis: it never changes the MachineFunction.
   return false;
 }
 
-void RISCVBranchSupportAnalysisWrapper::print(raw_ostream &OS,
+void RISCVBranchSetupAnalysisWrapper::print(raw_ostream &OS,
                                             const Module *) const {
   // `print()` is invoked without a MachineFunction handle (see
   // MachineFunctionPass::print / the -p / MIR pass-printing machinery), so
@@ -196,28 +196,28 @@ void RISCVBranchSupportAnalysisWrapper::print(raw_ostream &OS,
   OS << __func__ << " was called\n";
 }
 
-FunctionPass *llvm::createRISCVBranchSupportAnalysisPass() {
-  return new RISCVBranchSupportAnalysisWrapper();
+FunctionPass *llvm::createRISCVBranchSetupAnalysisPass() {
+  return new RISCVBranchSetupAnalysisWrapper();
 }
 
 //===----------------------------------------------------------------------===//
 // New PassManager analysis + printer.
 //===----------------------------------------------------------------------===//
 
-AnalysisKey RISCVBranchSupportAnalysis::Key;
+AnalysisKey RISCVBranchSetupAnalysis::Key;
 
-RISCVBranchSupportAnalysis::Result
-RISCVBranchSupportAnalysis::run(MachineFunction &MF,
+RISCVBranchSetupAnalysis::Result
+RISCVBranchSetupAnalysis::run(MachineFunction &MF,
                           MachineFunctionAnalysisManager &) {
-  RISCVBranchSupportInfo Info = computeRISCVBranchSupportInfo(MF);
-  if (PrintRISCVBranchSupportAnalysis)
+  RISCVBranchSetupInfo Info = computeRISCVBranchSetupInfo(MF);
+  if (PrintRISCVBranchSetupAnalysis)
     Info.print(errs(), MF);
   return Info;
 }
 
 PreservedAnalyses
-RISCVBranchSupportAnalysisPrinterPass::run(MachineFunction &MF,
+RISCVBranchSetupAnalysisPrinterPass::run(MachineFunction &MF,
                                      MachineFunctionAnalysisManager &MFAM) {
-  MFAM.getResult<RISCVBranchSupportAnalysis>(MF).print(OS, MF);
+  MFAM.getResult<RISCVBranchSetupAnalysis>(MF).print(OS, MF);
   return PreservedAnalyses::all();
 }
