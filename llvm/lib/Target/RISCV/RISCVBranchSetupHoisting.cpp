@@ -60,27 +60,34 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
   MDT = &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
   MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
 
-  // Fail early for functions with too many branches that would
-  // require proper register allocation
   if (BSI->Branches.size() > 30)
     return false;
 
-  BSI->dump(MF);
+  // Collect all (BranchMI, BranchSetup) pairs across ALL blocks FIRST.
+  struct BranchWork {
+    MachineInstr *MI;
+    MachineInstr *S, *T, *C;
+  };
+  SmallVector<BranchWork, 16> WorkList;
 
-  bool Changed = false;
   for (auto &MBB : MF) {
-    // Scan backwards from the end of the block to find branches
-    for (auto MII = MBB.rbegin(), MIE = MBB.rend(); MII != MIE; ) {
-      MachineInstr &MI = *MII++;
+    for (auto &MI : MBB) {
       if (RISCVBranchSetup BS = BSI->Branches.lookup(&MI)) {
-        MachineInstr *S = const_cast<MachineInstr *>(BS.S);
-        MachineInstr *T = const_cast<MachineInstr *>(BS.T);
-        MachineInstr *C = const_cast<MachineInstr *>(BS.C);
-        Changed |= scheduleBranchSetup(MI, S, T, C);
+        WorkList.push_back({
+          &MI,
+          const_cast<MachineInstr *>(BS.S),
+          const_cast<MachineInstr *>(BS.T),
+          const_cast<MachineInstr *>(BS.C)
+        });
       }
     }
   }
-  BSI->dump(MF);
+
+ 
+  bool Changed = false;
+  for (auto &W : WorkList)
+    Changed |= scheduleBranchSetup(*W.MI, W.S, W.T, W.C);
+
   return Changed;
 }
 
@@ -95,7 +102,7 @@ bool RISCVBranchSetupHoisting::scheduleBranchSetup(MachineInstr &MI,
   assert(T && "Branch must have BMOVT");
   bool Changed = false;
 
-  dbgs() << "Setup for:"; MI.dump();
+  // dbgs() << "Setup for:"; MI.dump();
 
   InsertPt = findEarliestSafePoint(S, MI);
   if (InsertPt != S->getIterator()) {
@@ -141,41 +148,123 @@ static bool isClobberedByCall(const MachineInstr &CallMI,
   return false;
 }
 
-MachineBasicBlock::iterator RISCVBranchSetupHoisting::findEarliestSafePoint(
-  MachineInstr *SetupMI, MachineInstr &BranchMI) {
-  MachineBasicBlock *CurBB = SetupMI->getParent();
-  MachineBasicBlock::iterator SafePoint = SetupMI->getIterator();
+/// Scan `BB` backwards from `From`, returning the earliest safe
+/// insertion point. `HazardFound` is set if we stopped early.
+/// Caller guarantees From != BB->rend().
+static MachineBasicBlock::iterator
+scanBlockBackward(MachineBasicBlock *BB,
+                  MachineBasicBlock::reverse_iterator From,
+                  MachineInstr *SetupMI,
+                  const TargetRegisterInfo *TRI,
+                  bool &HazardFound) {
+  HazardFound = false;
+  
+  // Try to hoist to the top of the func.
+  MachineBasicBlock::iterator SafePoint = BB->getFirstNonPHI();
 
-  SetupMI->dump();
-
-  // Track physical register uses/defs in SetupMI (e.g., b0, x1, x2)
-  Register DestReg = SetupMI->getOperand(0).getReg(); // b0
-
-  // Walk backwards through instructions to find dependencies/hazards
-  for (MachineBasicBlock::reverse_iterator I = std::next(SetupMI->getReverseIterator()), E = CurBB->rend(); I != E; ++I) {
+  for (auto I = From, E = BB->rend(); I != E; ++I) {
     MachineInstr &CurrMI = *I;
 
-    // HAZARD 1: Does CurrMI redefine any source registers used by SetupMI?
-    if (redefinesSourceRegs(CurrMI, *SetupMI, TRI)) {
-      dbgs() << "Source hazard with:"; CurrMI.dump();
+    
+    if (CurrMI.isPHI())
       break;
+
+    if (redefinesSourceRegs(CurrMI, *SetupMI, TRI)) {
+      dbgs() << "  [Hazard] Source reg redefined by: ";
+      CurrMI.dump();
+      HazardFound = true;
+
+      // Insert after this instr. 
+      return std::next(CurrMI.getIterator());
     }
 
-    // HAZARD 2: Is CurrMI a CALL that clobbers DestReg or SetupMI's sources?
     if (CurrMI.isCall()) {
-      dbgs() << "Call hazard with:"; CurrMI.dump();
-      // if (isClobberedByCall(CurrMI, *SetupMI, TRI))
-      break; // Call boundary reached, stop hoisting across this call
+      dbgs() << "  [Hazard] Call boundary at: ";
+      CurrMI.dump();
+      HazardFound = true;
+      return std::next(CurrMI.getIterator());
     }
 
-    // Safe to move above CurrMI
     SafePoint = CurrMI.getIterator();
   }
 
-  // TODO: Cross Basic Block Hoisting using MDT
-  // If SafePoint reached top of CurBB, check parent Dominator nodes...
   return SafePoint;
 }
+
+MachineBasicBlock::iterator RISCVBranchSetupHoisting::findEarliestSafePoint(
+    MachineInstr *SetupMI, MachineInstr &BranchMI) {
+
+  MachineBasicBlock *CurBB = SetupMI->getParent();
+  MachineBasicBlock::iterator SafePoint = SetupMI->getIterator();
+
+  // ---- Intra-block scan ---- Same as before. 
+  bool HazardFound = false;
+
+  auto IntraStart = std::next(SetupMI->getReverseIterator());
+  if (IntraStart != CurBB->rend())
+    SafePoint = scanBlockBackward(CurBB, IntraStart, SetupMI, TRI, HazardFound);
+  else
+    SafePoint = CurBB->getFirstNonPHI(); // SetupMI is already at the top.
+
+  if (HazardFound)
+    return SafePoint;
+
+  
+  //----- Cross-BB hoisting via the IDom chain ---- 
+  MachineLoop *SetupLoop = MLI->getLoopFor(CurBB);
+  MachineBasicBlock *BB = CurBB;
+
+  while (true) {
+    MachineDomTreeNode *Node = MDT->getNode(BB);
+    if (!Node)
+      break;
+
+    MachineDomTreeNode *IDomNode = Node->getIDom();
+    if (!IDomNode)
+      break;
+
+    MachineBasicBlock *IDom = IDomNode->getBlock();
+    if (!IDom || IDom->empty())
+      break;
+
+    // Don't hoist across loop boundaries.
+    MachineLoop *IDomLoop = MLI->getLoopFor(IDom);
+    if (IDomLoop != SetupLoop) {
+      dbgs() << "  [Stop] Loop boundary at BB#" << IDom->getNumber() << "\n";
+      break;
+    }
+
+    // Find scan start: just before the first terminator.
+    // Walk rbegin() forward past all terminators.
+    MachineBasicBlock::reverse_iterator IDomScanStart = IDom->rbegin();
+    while (IDomScanStart != IDom->rend() && IDomScanStart->isTerminator())
+      ++IDomScanStart;
+
+    // FIX: correct degenerate check — rend() means no non-terminator instrs.
+    if (IDomScanStart == IDom->rend()) {
+      dbgs() << "  [Skip] IDom BB#" << IDom->getNumber()
+             << " has no non-terminator instructions\n";
+      // Can still try to insert at block top (before terminators).
+      SafePoint = IDom->getFirstTerminator();
+      BB = IDom;
+      continue; // Try climbing higher.
+    }
+
+    MachineBasicBlock::iterator IDomSafePoint =
+        scanBlockBackward(IDom, IDomScanStart, SetupMI, TRI, HazardFound);
+
+    dbgs() << "  [Cross-BB] Hoisted into BB#" << IDom->getNumber() << "\n";
+    SafePoint = IDomSafePoint;
+    BB = IDom;
+
+    if (HazardFound)
+      break;
+  }
+
+  return SafePoint;
+}
+
+
 
 INITIALIZE_PASS(RISCVBranchSetupHoisting, "riscv-branch-setup-hoisting",
                 RISCV_BRANCH_SETUP_HOISTING_PASS_NAME,
