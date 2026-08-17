@@ -7,10 +7,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "RISCV.h"
-#include "RISCVInstrInfo.h"
 #include "RISCVBranchSetupAnalysis.h"
-#include "llvm/CodeGen/MachineFunctionPass.h"
+#include "RISCVInstrInfo.h"
 #include "llvm/CodeGen/MachineDominators.h"
+#include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
 
 using namespace llvm;
@@ -63,6 +63,31 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
   if (BSI->Branches.size() > 30)
     return false;
 
+  // Rewrite the registers.
+  unsigned BranchIdx = 0;
+  for (auto &[BranchMI, BS] : BSI->Branches) {
+    Register NewReg = Register(RISCV::B0 + BranchIdx++);
+
+    // rewrite the def operand (operand 0) of a setup instruction.
+    auto rewriteDef = [&](const MachineInstr *ConstMI) {
+      if (!ConstMI)
+        return;
+      MachineInstr *MI = const_cast<MachineInstr *>(ConstMI);
+      // assert(MI->getOperand(0).isReg() && MI->getOperand(0).isDef());
+      MI->getOperand(0).setReg(NewReg);
+    };
+
+    rewriteDef(BS.S);
+    rewriteDef(BS.T);
+    rewriteDef(BS.C);
+
+    // Rewrite all USE operands on the branch consumer MI.
+    MachineInstr *MI = const_cast<MachineInstr *>(BranchMI);
+    for (MachineOperand &MO : MI->operands())
+      if (MO.isReg() && MO.isUse() && MO.getReg() == RISCV::B0)
+        MO.setReg(NewReg);
+  }
+
   // Collect all (BranchMI, BranchSetup) pairs across ALL blocks FIRST.
   struct BranchWork {
     MachineInstr *MI;
@@ -73,17 +98,13 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
   for (auto &MBB : MF) {
     for (auto &MI : MBB) {
       if (RISCVBranchSetup BS = BSI->Branches.lookup(&MI)) {
-        WorkList.push_back({
-          &MI,
-          const_cast<MachineInstr *>(BS.S),
-          const_cast<MachineInstr *>(BS.T),
-          const_cast<MachineInstr *>(BS.C)
-        });
+        WorkList.push_back({&MI, const_cast<MachineInstr *>(BS.S),
+                            const_cast<MachineInstr *>(BS.T),
+                            const_cast<MachineInstr *>(BS.C)});
       }
     }
   }
 
- 
   bool Changed = false;
   for (auto &W : WorkList)
     Changed |= scheduleBranchSetup(*W.MI, W.S, W.T, W.C);
@@ -151,21 +172,17 @@ static bool isClobberedByCall(const MachineInstr &CallMI,
 /// Scan `BB` backwards from `From`, returning the earliest safe
 /// insertion point. `HazardFound` is set if we stopped early.
 /// Caller guarantees From != BB->rend().
-static MachineBasicBlock::iterator
-scanBlockBackward(MachineBasicBlock *BB,
-                  MachineBasicBlock::reverse_iterator From,
-                  MachineInstr *SetupMI,
-                  const TargetRegisterInfo *TRI,
-                  bool &HazardFound) {
+static MachineBasicBlock::iterator scanBlockBackward(
+    MachineBasicBlock *BB, MachineBasicBlock::reverse_iterator From,
+    MachineInstr *SetupMI, const TargetRegisterInfo *TRI, bool &HazardFound) {
   HazardFound = false;
-  
+
   // Try to hoist to the top of the func.
   MachineBasicBlock::iterator SafePoint = BB->getFirstNonPHI();
 
   for (auto I = From, E = BB->rend(); I != E; ++I) {
     MachineInstr &CurrMI = *I;
 
-    
     if (CurrMI.isPHI())
       break;
 
@@ -174,7 +191,7 @@ scanBlockBackward(MachineBasicBlock *BB,
       CurrMI.dump();
       HazardFound = true;
 
-      // Insert after this instr. 
+      // Insert after this instr.
       return std::next(CurrMI.getIterator());
     }
 
@@ -191,13 +208,14 @@ scanBlockBackward(MachineBasicBlock *BB,
   return SafePoint;
 }
 
-MachineBasicBlock::iterator RISCVBranchSetupHoisting::findEarliestSafePoint(
-    MachineInstr *SetupMI, MachineInstr &BranchMI) {
+MachineBasicBlock::iterator
+RISCVBranchSetupHoisting::findEarliestSafePoint(MachineInstr *SetupMI,
+                                                MachineInstr &BranchMI) {
 
   MachineBasicBlock *CurBB = SetupMI->getParent();
   MachineBasicBlock::iterator SafePoint = SetupMI->getIterator();
 
-  // ---- Intra-block scan ---- Same as before. 
+  // ---- Intra-block scan ---- Same as before.
   bool HazardFound = false;
 
   auto IntraStart = std::next(SetupMI->getReverseIterator());
@@ -209,8 +227,7 @@ MachineBasicBlock::iterator RISCVBranchSetupHoisting::findEarliestSafePoint(
   if (HazardFound)
     return SafePoint;
 
-  
-  //----- Cross-BB hoisting via the IDom chain ---- 
+  //----- Cross-BB hoisting via the IDom chain ----
   MachineLoop *SetupLoop = MLI->getLoopFor(CurBB);
   MachineBasicBlock *BB = CurBB;
 
@@ -263,8 +280,6 @@ MachineBasicBlock::iterator RISCVBranchSetupHoisting::findEarliestSafePoint(
 
   return SafePoint;
 }
-
-
 
 INITIALIZE_PASS(RISCVBranchSetupHoisting, "riscv-branch-setup-hoisting",
                 RISCV_BRANCH_SETUP_HOISTING_PASS_NAME,
