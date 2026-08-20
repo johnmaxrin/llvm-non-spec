@@ -759,7 +759,10 @@ static void relaxCall(Ctx &ctx, const InputSection &sec, size_t i, uint64_t loc,
   const uint64_t insnPair = read64le(sec.content().data() + r.offset);
 
   // Ensure we are reading a BMOVT_I instruction.
-  assert(0b1011011 == extractBits(insnPair, 32 + 6, 32 + 0));
+  assert(BMOV_I == extractBits(insnPair, 32 + 6, 32 + 0));
+  // Pulled from BMOVT_I register breg (rd)
+  uint32_t breg = extractBits(insnPair, 32 + 11, 32 + 7);
+  // Pulled from BMOVT_I register rs1
   uint32_t rd = extractBits(insnPair, 32 + 19, 32 + 15);
 
   const uint64_t dest =
@@ -781,8 +784,7 @@ static void relaxCall(Ctx &ctx, const InputSection &sec, size_t i, uint64_t loc,
     remove = 6;
   } else if (remove >= 4 && isInt<21>(displace)) {
     sec.relaxAux->relocTypes[i] = R_RISCV_JAL;
-    rd = 0; // Use B0
-    sec.relaxAux->writes.push_back(0b0101011 | rd << 7); // bmovt
+    sec.relaxAux->writes.push_back(BMOVT_J | breg << 7); // bmovt
     remove = 4;
   } else {
     llvm_unreachable("TODO [non-spec] We must change BMOVS to be +4 here!");
