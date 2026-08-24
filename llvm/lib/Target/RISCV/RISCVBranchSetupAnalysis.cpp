@@ -48,9 +48,9 @@ void RISCVBranchSetup::dump() const {
   dbgs() << '\n';
 }
 void RISCVBranchSetup::print(raw_ostream &OS) const {
-  if (S) { OS << "*" << *S << "\n"; }
-  if (T) { OS << "*" << *T << "\n"; }
-  if (C) { OS << "*" << *C << "\n"; }
+  OS << "S = "; if (S) { OS << *S; } else { OS << "nullptr\n"; }
+  OS << "T = "; if (T) { OS << *T; } else { OS << "nullptr\n"; }
+  OS << "C = "; if (C) { OS << *C; } else { OS << "nullptr\n"; }
 }
 
 static RISCVBranchSetup FindBranchSetup(const MachineInstr &PBMI) {

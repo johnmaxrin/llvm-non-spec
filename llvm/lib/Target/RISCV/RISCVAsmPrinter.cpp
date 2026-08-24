@@ -315,32 +315,11 @@ void RISCVAsmPrinter::emitNTLHint(const MachineInstr *MI) {
 void RISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
   RISCV_MC::verifyInstructionPredicates(MI->getOpcode(), STI->getFeatureBits());
 
-#if 0
-  switch (MI->getOpcode()) {
-  case RISCV::PseudoBR:
-  case RISCV::PseudoBREQ:
-  case RISCV::PseudoBRNE:
-  case RISCV::PseudoBRGE:
-  case RISCV::PseudoBRGEU:
-  case RISCV::PseudoBRLT:
-  case RISCV::PseudoBRLTU:
-  case RISCV::JAL:
-  case RISCV::JALR:
-  case RISCV::BEQ:
-  case RISCV::BNE:
-  case RISCV::BGE:
-  case RISCV::BGEU:
-  case RISCV::BLT:
-  case RISCV::BLTU:
-    llvm_unreachable("TODO: NEEDS FIXING");
-  default:
-    break;
-  }
-#endif
-
   emitNTLHint(MI);
 
   if (RISCVBranchSetup BS = BranchSupportInfo->Branches.lookup(MI)) {
+    assert(BS.S && "Every branch must have a source address!");
+    assert(BS.T && "Every branch must have a target address!");
     MCSymbol *Sym = BS.S->getOperand(1).getMCSymbol();
     OutStreamer->emitLabel(Sym);
   }
