@@ -152,6 +152,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVLoadStoreOptPass(*PR);
   initializeRISCVExpandAtomicPseudoPass(*PR);
   initializeRISCVBranchSetupHoistingPass(*PR);
+  initializeRISCVBranchConditionPipeliningPass(*PR);
   initializeRISCVRedundantCopyEliminationPass(*PR);
   initializeRISCVBranchSetupAnalysisWrapperPass(*PR);
   initializeRISCVAsmPrinterPass(*PR);
@@ -482,6 +483,9 @@ void RISCVPassConfig::addIRPasses() {
     addPass(createRISCVCodeGenPreparePass());
   }
 
+  // Runs before HardwareLoops, which then converts the loops it creates.
+  if (getOptLevel() != CodeGenOptLevel::None)
+    addPass(createRISCVBranchConditionPipeliningPass());
   addPass(createHardwareLoopsLegacyPass());
 
   TargetPassConfig::addIRPasses();

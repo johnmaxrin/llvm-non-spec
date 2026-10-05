@@ -19660,6 +19660,70 @@ static SDValue performSHLCombine(SDNode *N,
                      Passthru, Mask, VL);
 }
 
+/// Turn llvm.riscv.ns.cond.init and llvm.riscv.ns.cond.push into their
+/// target nodes. Doing this in a combine rather than in LowerINTRINSIC_VOID
+/// keeps it independent of whether INTRINSIC_VOID is custom-lowered, which
+/// depends on the vector extension. llvm.riscv.ns.cond.pop is folded into the
+/// BRCOND it feeds.
+static SDValue lowerNSCondQueueIntrinsic(SDNode *N, SelectionDAG &DAG,
+                                         const RISCVSubtarget &Subtarget) {
+  SDLoc DL(N);
+  MVT XLenVT = Subtarget.getXLenVT();
+  SDValue Chain = N->getOperand(0);
+  SDValue Queue = DAG.getTargetConstant(N->getConstantOperandVal(2), DL, XLenVT);
+
+  // Operands: (chain, int_id, queue)
+  if (N->getConstantOperandVal(1) == Intrinsic::riscv_ns_cond_init)
+    return DAG.getNode(RISCVISD::NS_QINIT, DL, MVT::Other, Chain, Queue);
+
+  // Operands: (chain, int_id, queue, pred, lhs, rhs)
+  assert(N->getConstantOperandVal(1) == Intrinsic::riscv_ns_cond_push);
+  SDValue LHS = N->getOperand(4);
+  SDValue RHS = N->getOperand(5);
+  if (LHS.getValueType() != XLenVT)
+    report_fatal_error("llvm.riscv.ns.cond.push operands must be XLen wide");
+
+  // BMOVC_* only compares in the senses of the branch instructions, so the
+  // other predicates swap their operands.
+  RISCVCC::CondCode CC;
+  switch (static_cast<CmpInst::Predicate>(N->getConstantOperandVal(3))) {
+  default:
+    report_fatal_error("llvm.riscv.ns.cond.push needs an integer predicate");
+  case CmpInst::ICMP_EQ:
+    CC = RISCVCC::COND_EQ;
+    break;
+  case CmpInst::ICMP_NE:
+    CC = RISCVCC::COND_NE;
+    break;
+  case CmpInst::ICMP_SGT:
+    std::swap(LHS, RHS);
+    [[fallthrough]];
+  case CmpInst::ICMP_SLT:
+    CC = RISCVCC::COND_LT;
+    break;
+  case CmpInst::ICMP_SLE:
+    std::swap(LHS, RHS);
+    [[fallthrough]];
+  case CmpInst::ICMP_SGE:
+    CC = RISCVCC::COND_GE;
+    break;
+  case CmpInst::ICMP_UGT:
+    std::swap(LHS, RHS);
+    [[fallthrough]];
+  case CmpInst::ICMP_ULT:
+    CC = RISCVCC::COND_LTU;
+    break;
+  case CmpInst::ICMP_ULE:
+    std::swap(LHS, RHS);
+    [[fallthrough]];
+  case CmpInst::ICMP_UGE:
+    CC = RISCVCC::COND_GEU;
+    break;
+  }
+  return DAG.getNode(RISCVISD::NS_QPUSH, DL, MVT::Other, Chain, Queue, LHS,
+                     RHS, DAG.getTargetConstant(CC, DL, XLenVT));
+}
+
 SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
                                                DAGCombinerInfo &DCI) const {
   SelectionDAG &DAG = DCI.DAG;
@@ -19685,9 +19749,10 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
     break;
   case ISD::BRCOND: {
     // SelectionDAGBuilder inverts a branch whose true successor is the layout
-    // successor, so the decrement can show up as (xor dec, 1), which the
+    // successor, so the intrinsic can show up as (xor dec, 1), which the
     // generic combine then rewrites to (setcc dec, 1, setne). Look through
-    // both, tracking whether the brcond is taken when the loop exits.
+    // both, tracking whether the brcond is taken when the intrinsic returns
+    // false (for llvm.loop.decrement, when the loop exits).
     SDValue Dec = N->getOperand(1);
     bool BranchesToExit = false;
     while (true) {
@@ -19709,8 +19774,23 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
       }
     }
 
-    if (Dec.getOpcode() != ISD::INTRINSIC_W_CHAIN ||
-        Dec.getConstantOperandVal(1) != Intrinsic::loop_decrement)
+    if (Dec.getOpcode() != ISD::INTRINSIC_W_CHAIN)
+      return SDValue();
+
+    if (Dec.getConstantOperandVal(1) == Intrinsic::riscv_ns_cond_pop) {
+      // Unlike LOOP_END, a queued branch can be taken on either value, so
+      // record the inversion instead of swapping destinations; the expansion
+      // inverts the pushes to the queue to match.
+      SDValue Queue =
+          DAG.getTargetConstant(Dec.getConstantOperandVal(2), DL, XLenVT);
+      SDValue Inverted = DAG.getTargetConstant(BranchesToExit, DL, XLenVT);
+      // The pop is folded into the branch, so splice it out of the chain.
+      DAG.ReplaceAllUsesOfValueWith(Dec.getValue(1), Dec.getOperand(0));
+      return DAG.getNode(RISCVISD::NS_QBR, DL, MVT::Other, N->getOperand(0),
+                         Queue, Inverted, N->getOperand(2));
+    }
+
+    if (Dec.getConstantOperandVal(1) != Intrinsic::loop_decrement)
       return SDValue();
 
     SDValue Target = N->getOperand(2);
@@ -20660,6 +20740,9 @@ SDValue RISCVTargetLowering::PerformDAGCombine(SDNode *N,
       // By default we do not combine any intrinsic.
     default:
       return SDValue();
+    case Intrinsic::riscv_ns_cond_init:
+    case Intrinsic::riscv_ns_cond_push:
+      return lowerNSCondQueueIntrinsic(N, DAG, Subtarget);
     case Intrinsic::riscv_vcpop:
     case Intrinsic::riscv_vcpop_mask:
     case Intrinsic::riscv_vfirst:
