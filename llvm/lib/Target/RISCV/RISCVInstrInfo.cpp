@@ -1663,6 +1663,8 @@ bool RISCVInstrInfo::isBranchOffsetInRange(unsigned BranchOp,
   case RISCV::PseudoBRGE:
   case RISCV::PseudoBRGEU:
   case RISCV::PseudoLoopEnd:
+  case RISCV::PseudoPBC:
+  case RISCV::PseudoPBU:
   // TODO(non-spec,mitch): Don't think this is right..
     return true;
   }

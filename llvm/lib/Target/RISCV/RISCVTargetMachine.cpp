@@ -605,7 +605,6 @@ void RISCVPassConfig::addPreEmitPass2() {
     return MF.getFunction().getParent()->getModuleFlag("kcfi");
   }));
 
-  addPass(createRISCVLoopFissionDecomposedBranchPass()); // Loop Fission
   addPass(createRISCVBranchSetupHoistingPass());
   addPass(createFastRegisterAllocator());
   addPass(createVirtRegRewriter());
@@ -640,6 +639,7 @@ void RISCVPassConfig::addPreRegAlloc() {
   if (TM->getOptLevel() != CodeGenOptLevel::None && EnableMachinePipeliner)
     addPass(&MachinePipelinerID);
 
+  addPass(createRISCVLoopFissionDecomposedBranchPass()); // Loop Fission
   addPass(createRISCVVMV0EliminationPass());
 }
 
