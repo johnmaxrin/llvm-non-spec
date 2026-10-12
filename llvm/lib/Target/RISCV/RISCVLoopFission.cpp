@@ -1,20 +1,32 @@
 //==- RISCVLoopFissionDecomposedBranch.cpp - Fission loops for BMOV slack -==//
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// This pass splits a counted loop containing a single internal
-// data-dependent conditional branch into two loops: a "compute" loop
-// that only evaluates the branch condition and enqueues outcomes via
-// BMOVC, and a "consume" loop that retains the original body and reads
-// precomputed outcomes via PB. This creates slack between BMOVC and PB
-// for decomposed-branch execution, as described in the ASPLOS paper
-// "Secure, Speculation-Free Execution via Decomposed Branches."
-//
-//===----------------------------------------------------------------------===//
+
+/*
+// test_fission.c
+#include "test.h"
+
+#define N 200
+
+void test_fission(int *restrict a, int *restrict out, int t) {
+    for (int i = 0; i < N; i++)
+        if (a[i] < t)
+            out[i] = a[i] * 3;
+}
+
+void _start(void) {
+    static int data[N];
+    static int out[N];
+
+    for (int i = 0; i < N; i++)
+        data[i] = i % 37;
+
+    test_fission(data, out, 20);
+
+    EMIT64(out[0]);   // emit a computed scalar value
+
+    _exit(0);
+}
+*/
 
 #include "RISCV.h"
 #include "RISCVBranchSetupAnalysis.h"
