@@ -878,8 +878,9 @@ let RegInfos = XLenRI in {
 foreach Index = 0-31 in
   def B#Index : RISCVReg<Index, "b"#Index>;
 
-// def PBR : RISCVRegisterClass<[untyped], 32, (add (sequence "B%u", 0, 31))>;
-// NOTE(non-spec,mitch): Not sure about this change..
-def PBR : RISCVRegisterClass<[XLenVT], 32, (add (sequence "B%u", 0, 31))> {
-  let RegInfos = XLenRI;
+def PBRRI : RegInfoByHwMode<[RV32, RV64],
+                            [RegInfo<384, 384, 128>, RegInfo<384, 384, 128>]>;
+
+def PBR : RISCVRegisterClass<[XLenVT], 128, (add (sequence "B%u", 0, 31))> {
+  let RegInfos = PBRRI;
 }

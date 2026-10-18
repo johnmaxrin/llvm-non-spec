@@ -54,7 +54,7 @@ add_llvm_target(RISCVCodeGen
   RISCVLateBranchOpt.cpp
   RISCVLoadStoreOptimizer.cpp
   RISCVLoopFission.cpp
-  RISCVNonSpec.cpp
+  # RISCVNonSpec.cpp
   RISCVMachineFunctionInfo.cpp
   RISCVMakeCompressible.cpp
   RISCVMergeBaseOffset.cpp
