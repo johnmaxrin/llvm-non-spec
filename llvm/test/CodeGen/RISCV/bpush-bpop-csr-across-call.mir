@@ -1,0 +1,26 @@
+# RUN: llc -mtriple=riscv64 -start-before=greedy -stop-after=prologepilog -o - %s | FileCheck %s
+--- |
+  declare void @foo()
+  define void @across() { ret void }
+...
+---
+name: across
+tracksRegLiveness: true
+frameInfo:
+  adjustsStack: true
+  hasCalls: true
+body: |
+  bb.0:
+    liveins: $x10
+    %0:gpr = COPY $x10
+    %1:pbr = BMOVS_I %0, 0
+    ADJCALLSTACKDOWN 0, 0, implicit-def $x2, implicit $x2
+    PseudoCALL target-flags(riscv-call) @foo, csr_ilp32_lp64, implicit-def $x1, implicit-def $x2
+    ADJCALLSTACKUP 0, 0, implicit-def $x2, implicit $x2
+    BPUSH %1, %0, 0
+    PseudoRET
+...
+# CHECK: frame-setup BPUSH killed $b24, $x2, 0
+# CHECK: renamable $b24 = BMOVS_I
+# CHECK-NEXT: PseudoCALL
+# CHECK: frame-destroy BPOP $x2, 0
