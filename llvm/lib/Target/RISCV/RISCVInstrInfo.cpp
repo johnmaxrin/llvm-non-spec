@@ -564,6 +564,11 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
+// Branch Reg Copy
+  if (RISCV::PBRRegClass.contains(DstReg, SrcReg)) 
+    report_fatal_error("PBR-to-PBR copy not supported");
+
+
   if (RISCV::FPR16RegClass.contains(DstReg, SrcReg)) {
     unsigned Opc;
     if (STI.hasStdExtZfh()) {
@@ -637,6 +642,7 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
+  
   llvm_unreachable("Impossible reg-to-reg copy");
 }
 
