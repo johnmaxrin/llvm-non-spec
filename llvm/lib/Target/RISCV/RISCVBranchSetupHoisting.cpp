@@ -167,6 +167,7 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
 
   constexpr unsigned MaxBranchSetups = 32;
   if (BSI->Branches.size() > MaxBranchSetups) {
+    
     return false;
   }
 

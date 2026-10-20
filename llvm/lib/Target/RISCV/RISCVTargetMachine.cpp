@@ -154,6 +154,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVBranchSetupHoistingPass(*PR);
   initializeRISCVRedundantCopyEliminationPass(*PR);
   initializeRISCVBranchSetupAnalysisWrapperPass(*PR);
+  initializeRISCVLoopFissionDecomposedBranchPass(*PR); // Loop Fission
   initializeRISCVAsmPrinterPass(*PR);
 }
 
@@ -638,6 +639,7 @@ void RISCVPassConfig::addPreRegAlloc() {
   if (TM->getOptLevel() != CodeGenOptLevel::None && EnableMachinePipeliner)
     addPass(&MachinePipelinerID);
 
+  addPass(createRISCVLoopFissionDecomposedBranchPass()); // Loop Fission
   addPass(createRISCVVMV0EliminationPass());
 }
 

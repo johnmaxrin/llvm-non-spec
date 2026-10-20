@@ -786,14 +786,6 @@ def BMOVT_I : RVInstI<0b001, OPC_CUSTOM_2, (outs PBR:$rd), (ins PBR:$rd_src, GPR
 								"bmovt", "$rd, $rs1, $imm12">;
 }
 
-let hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
-def BPOP : RVInstI<0b010, OPC_CUSTOM_2, (outs PBR:$rd), (ins GPRMem:$rs1, simm12:$imm12),
-								"bpop", "$rd, ${imm12}(${rs1})">, Sched<[WriteLDD, ReadMemBase]>;
-
-let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
-def BPUSH : RVInstS<0b011, OPC_CUSTOM_2, (outs), (ins PBR:$rs2, GPRMem:$rs1, simm12:$imm12),
-              "bpush", "$rs2, ${imm12}(${rs1})">, Sched<[WriteSTD, ReadStoreData, ReadMemBase]>;
-
 def BMOVC_BEQ : BMOVC_rri<0b000, "bmovc_beq">;
 def BMOVC_BNE : BMOVC_rri<0b001, "bmovc_bne">;
 def BMOVC_BLT : BMOVC_rri<0b100, "bmovc_blt">;
@@ -809,6 +801,14 @@ def BMOVC_BITS : RVInstI<0b010, OPC_OP_VE, (outs PBR:$rd), (ins PBR:$rd_src, GPR
                                 "bmovc_bits", "$rd, $rs1, $imm12">;
 }
 }
+
+let isBMOV = 0, hasSideEffects = 0, mayLoad = 1, mayStore = 0 in
+def BPOP : RVInstI<0b010, OPC_CUSTOM_2, (outs PBR:$rd), (ins GPRMem:$rs1, simm12:$imm12),
+                   "bpop", "$rd, ${imm12}(${rs1})">, Sched<[WriteLDD, ReadMemBase]>;
+
+let isBMOV = 0, hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
+def BPUSH : RVInstS<0b011, OPC_CUSTOM_2, (outs), (ins PBR:$rs2, GPRMem:$rs1, simm12:$imm12),
+                    "bpush", "$rs2, ${imm12}(${rs1})">, Sched<[WriteSTD, ReadStoreData, ReadMemBase]>;
 
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, isBarrier = 1, isBranch = 1, isTerminator = 1 in {
 def PBAL : RVInstR<0b0000000, 0b000, OPC_CUSTOM_3, (outs), (ins GPR:$rd, PBR:$rs1, GPR:$rs2),
@@ -1811,11 +1811,11 @@ def PseudoLongBGEU : LongBccPseudo;
 
 let isBarrier = 0, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
 def PseudoPBC : Pseudo<(outs), (ins PBR:$rs1, simm21_lsb0_jal:$imm20), []>,
-                PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
+                PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>{let Size = 4;}
 
 let isBarrier = 1, isBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
 def PseudoPBU : Pseudo<(outs), (ins PBR:$rs1, simm21_lsb0_jal:$imm20), []>,
-                PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>;
+                PseudoInstExpansion<(PBAL X0, PBR:$rs1, X0)>{let Size = 4;}
 
 let isBarrier = 1, isBranch = 1, isIndirectBranch = 1, isTerminator = 1, mayLoad = 0, mayStore = 0, hasSideEffects = 0 in
 def PseudoPBI : Pseudo<(outs), (ins PBR:$rs1), []>,

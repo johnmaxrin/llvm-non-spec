@@ -123,6 +123,9 @@ void initializeRISCVBranchSetupHoistingPass(PassRegistry &);
 FunctionPass *createRISCVBranchSetupAnalysisPass();
 void initializeRISCVBranchSetupAnalysisWrapperPass(PassRegistry &);
 
+FunctionPass *createRISCVLoopFissionDecomposedBranchPass();
+void initializeRISCVLoopFissionDecomposedBranchPass(PassRegistry &);
+
 void initializeRISCVAsmPrinterPass(PassRegistry &);
 } // namespace llvm
 
