@@ -223,6 +223,337 @@ exit:
   ret void
 }
 
+; Partitioning around a pivot. k advances by at most one element per
+; iteration, so the swap's a[k] never passes a[i], and stays behind every
+; element the condition reads ahead. The kernel carries k into the original
+; loop like any other phi.
+; for (i = 0; i < n; ++i) if (a[i] < pivot) swap(&a[i], &a[k++]);
+define i32 @partition(ptr %a, i32 %n, i32 %pivot) {
+; CHECK-LABEL: define {{.*}} @partition(
+; CHECK:       swp.ph:
+; CHECK-COUNT-4: call void @llvm.riscv.ns.cond.push.i64
+; CHECK-NOT:     call void @llvm.riscv.ns.cond.push.i64
+; CHECK:         %swp.kernel.count = sub nuw i64 %tc, 4
+; CHECK:       loop.swp:
+; CHECK-NEXT:    %swp.kernel.iv = phi i64
+; CHECK-NEXT:    %i.swp = phi i64
+; CHECK-NEXT:    %k.swp = phi i32 [ 0, %swp.ph ], [ %k.next.swp, %latch.swp ]
+; CHECK:         %i.ahead = add i64 %i.swp, 4
+; CHECK:         [[POP:%.*]] = call i1 @llvm.riscv.ns.cond.pop(i32 0)
+; CHECK-NEXT:    br i1 [[POP]], label %then.swp, label %latch.swp
+; CHECK:       swp.drain.ph:
+; CHECK-NEXT:    %i.swp.resume = phi i64
+; CHECK-NEXT:    %k.swp.resume = phi i32 [ 0, %ph ], [ %k.next.swp, %swp.kernel.exit ]
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %tc = zext nneg i32 %n to i64
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %k = phi i32 [ 0, %ph ], [ %k.next, %latch ]
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp slt i32 %v, %pivot
+  br i1 %c, label %then, label %latch
+
+then:
+  %k.inc = add nsw i32 %k, 1
+  %k.ext = sext i32 %k to i64
+  %q = getelementptr inbounds i32, ptr %a, i64 %k.ext
+  %w = load i32, ptr %q
+  store i32 %v, ptr %q
+  store i32 %w, ptr %p
+  br label %latch
+
+latch:
+  %k.next = phi i32 [ %k.inc, %then ], [ %k, %loop ]
+  %i.next = add nuw nsw i64 %i, 1
+  %done = icmp eq i64 %i.next, %tc
+  br i1 %done, label %exit, label %loop
+
+exit:
+  %r = phi i32 [ 0, %entry ], [ %k.next, %latch ]
+  ret i32 %r
+}
+
+; The same with an output pointer, which advances by a byte offset.
+; for (i = 0; i < n; ++i) if (a[i] != 0) *out++ = a[i];  // out = a
+define ptr @compact(ptr %a, i32 %n) {
+; CHECK-LABEL: define {{.*}} @compact(
+; CHECK:       swp.ph:
+; CHECK-COUNT-4: call void @llvm.riscv.ns.cond.push.i64
+; CHECK:       loop.swp:
+; CHECK:         %out.swp = phi ptr [ %a, %swp.ph ], [ %out.next.swp, %latch.swp ]
+; CHECK:         call i1 @llvm.riscv.ns.cond.pop(i32 0)
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %tc = zext nneg i32 %n to i64
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %out = phi ptr [ %a, %ph ], [ %out.next, %latch ]
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp ne i32 %v, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  store i32 %v, ptr %out
+  %out.inc = getelementptr inbounds i8, ptr %out, i64 4
+  br label %latch
+
+latch:
+  %out.next = phi ptr [ %out.inc, %then ], [ %out, %loop ]
+  %i.next = add nuw nsw i64 %i, 1
+  %done = icmp eq i64 %i.next, %tc
+  br i1 %done, label %exit, label %loop
+
+exit:
+  %r = phi ptr [ %a, %entry ], [ %out.next, %latch ]
+  ret ptr %r
+}
+
+; The counter can also advance through a select.
+; for (i = 0; i < n; ++i) if (a[i] < pivot) a[k++] = a[i];
+define void @filter_select(ptr %a, i32 %n, i32 %pivot) {
+; CHECK-LABEL: define {{.*}} @filter_select(
+; CHECK:       swp.ph:
+; CHECK-COUNT-4: call void @llvm.riscv.ns.cond.push.i64
+; CHECK:       loop.swp:
+; CHECK:         call i1 @llvm.riscv.ns.cond.pop(i32 0)
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %tc = zext nneg i32 %n to i64
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %k = phi i32 [ 0, %ph ], [ %k.next, %latch ]
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp slt i32 %v, %pivot
+  %k.inc = add nsw i32 %k, 1
+  %k.next = select i1 %c, i32 %k.inc, i32 %k
+  br i1 %c, label %then, label %latch
+
+then:
+  %k.ext = sext i32 %k to i64
+  %q = getelementptr inbounds i32, ptr %a, i64 %k.ext
+  store i32 %v, ptr %q
+  br label %latch
+
+latch:
+  %i.next = add nuw nsw i64 %i, 1
+  %done = icmp eq i64 %i.next, %tc
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; A store to a fixed element only meets the load that reads that element, in
+; iteration 0, and the prologue still runs that load before the store.
+define void @fixed_store(ptr %a, i32 %n) {
+; CHECK-LABEL: define {{.*}} @fixed_store(
+; CHECK:       swp.ph:
+; CHECK-COUNT-4: call void @llvm.riscv.ns.cond.push.i64
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %tc = zext nneg i32 %n to i64
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp slt i32 %v, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  store i32 0, ptr %a
+  br label %latch
+
+latch:
+  %i.next = add nuw nsw i64 %i, 1
+  %done = icmp eq i64 %i.next, %tc
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; k can advance by two elements in an iteration, and so overtake i.
+define void @counter_overtakes(ptr %a, i32 %n) {
+; CHECK-LABEL: define {{.*}} @counter_overtakes(
+; CHECK-NOT:     llvm.riscv.ns.cond
+; CHECK:       ret void
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %tc = zext nneg i32 %n to i64
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %k = phi i32 [ 0, %ph ], [ %k.next, %latch ]
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp slt i32 %v, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %k.inc = add nsw i32 %k, 2
+  %k.ext = sext i32 %k to i64
+  %q = getelementptr inbounds i32, ptr %a, i64 %k.ext
+  store i32 0, ptr %q
+  br label %latch
+
+latch:
+  %k.next = phi i32 [ %k.inc, %then ], [ %k, %loop ]
+  %i.next = add nuw nsw i64 %i, 1
+  %done = icmp eq i64 %i.next, %tc
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; The store to a[k] runs before the load of a[i] in its iteration, and k can
+; equal i.
+define void @counter_store_first(ptr %a, i32 %n) {
+; CHECK-LABEL: define {{.*}} @counter_store_first(
+; CHECK-NOT:     llvm.riscv.ns.cond
+; CHECK:       ret void
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %tc = zext nneg i32 %n to i64
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %k = phi i32 [ 0, %ph ], [ %k.next, %latch ]
+  %k.ext = sext i32 %k to i64
+  %q = getelementptr inbounds i32, ptr %a, i64 %k.ext
+  store i32 0, ptr %q
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp slt i32 %v, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %k.inc = add nsw i32 %k, 1
+  br label %latch
+
+latch:
+  %k.next = phi i32 [ %k.inc, %then ], [ %k, %loop ]
+  %i.next = add nuw nsw i64 %i, 1
+  %done = icmp eq i64 %i.next, %tc
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; k only moves down, away from a[i], but without nsw it could wrap around to
+; the top of its range and so land ahead of a[i].
+define void @counter_may_wrap(ptr %a, i32 %n) {
+; CHECK-LABEL: define {{.*}} @counter_may_wrap(
+; CHECK-NOT:     llvm.riscv.ns.cond
+; CHECK:       ret void
+entry:
+  %guard = icmp sgt i32 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  %tc = zext nneg i32 %n to i64
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %k = phi i32 [ 0, %ph ], [ %k.next, %latch ]
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp slt i32 %v, 0
+  br i1 %c, label %then, label %latch
+
+then:
+  %k.dec = add i32 %k, -2
+  %k.ext = sext i32 %k to i64
+  %q = getelementptr inbounds i32, ptr %a, i64 %k.ext
+  store i32 0, ptr %q
+  br label %latch
+
+latch:
+  %k.next = phi i32 [ %k.dec, %then ], [ %k, %loop ]
+  %i.next = add nuw nsw i64 %i, 1
+  %done = icmp eq i64 %i.next, %tc
+  br i1 %done, label %exit, label %loop
+
+exit:
+  ret void
+}
+
+; Like @partition, but nothing bounds the trip count, and so nothing bounds
+; how far a[i] gets ahead of a[k]. That gap could, in principle, wrap around
+; the address space.
+define i32 @partition_unbounded(ptr %a, i64 %n, i32 %pivot) {
+; CHECK-LABEL: define {{.*}} @partition_unbounded(
+; CHECK-NOT:     llvm.riscv.ns.cond
+; CHECK:       ret i32
+entry:
+  %guard = icmp sgt i64 %n, 0
+  br i1 %guard, label %ph, label %exit
+
+ph:
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %ph ], [ %i.next, %latch ]
+  %k = phi i32 [ 0, %ph ], [ %k.next, %latch ]
+  %p = getelementptr inbounds i32, ptr %a, i64 %i
+  %v = load i32, ptr %p
+  %c = icmp slt i32 %v, %pivot
+  br i1 %c, label %then, label %latch
+
+then:
+  %k.inc = add nsw i32 %k, 1
+  %k.ext = sext i32 %k to i64
+  %q = getelementptr inbounds i32, ptr %a, i64 %k.ext
+  %w = load i32, ptr %q
+  store i32 %v, ptr %q
+  store i32 %w, ptr %p
+  br label %latch
+
+latch:
+  %k.next = phi i32 [ %k.inc, %then ], [ %k, %loop ]
+  %i.next = add nuw i64 %i, 1
+  %done = icmp eq i64 %i.next, %n
+  br i1 %done, label %exit, label %loop
+
+exit:
+  %r = phi i32 [ 0, %entry ], [ %k.next, %latch ]
+  ret i32 %r
+}
+
 declare void @ext()
 
 ; The call could write anything the condition reads.

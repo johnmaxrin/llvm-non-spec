@@ -78,7 +78,9 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsRISCV.h"
+#include "llvm/IR/PatternMatch.h"
 #include "llvm/InitializePasses.h"
+#include "llvm/Support/CheckedArithmetic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -88,6 +90,7 @@
 #include <optional>
 
 using namespace llvm;
+using namespace llvm::PatternMatch;
 
 #define DEBUG_TYPE "riscv-branch-condition-pipelining"
 #define PASS_NAME "RISC-V branch condition pipelining"
@@ -173,6 +176,20 @@ struct LoopPlan {
   }
 };
 
+/// The integers from Lo to Hi.
+struct Interval {
+  int64_t Lo;
+  int64_t Hi;
+};
+
+/// How the address of a memory access moves through a loop: in iteration t
+/// it is Start plus between MinStep * t and MaxStep * t bytes.
+struct AddressEvolution {
+  const SCEV *Start;
+  int64_t MinStep;
+  int64_t MaxStep;
+};
+
 class RISCVBranchConditionPipelining : public FunctionPass {
 public:
   static char ID;
@@ -207,6 +224,10 @@ private:
   std::optional<unsigned> findInductionVar(LoopPlan &P, PHINode *Phi);
   unsigned findSafeDistance(const LoopPlan &P, const PipelinedBranch &PB,
                             unsigned Distance);
+  std::optional<AddressEvolution> getAddressEvolution(const LoopPlan &P,
+                                                      Value *Ptr);
+  std::optional<AddressEvolution> getTermEvolution(const LoopPlan &P,
+                                                   const SCEV *Term);
   bool isLoadMovableAcross(const LoopPlan &P, const PipelinedBranch &PB,
                            LoadInst *Load, StoreInst *Store,
                            unsigned Distance);
@@ -401,6 +422,156 @@ bool RISCVBranchConditionPipelining::buildSlice(LoopPlan &P,
 /// worth the trouble of checking exactly.
 static constexpr int64_t MaxCheckedOffset = int64_t(1) << 40;
 
+static bool isTooFar(std::optional<int64_t> V) {
+  return !V || *V > MaxCheckedOffset || *V < -MaxCheckedOffset;
+}
+
+/// How many definitions offsetFromPhi follows back from a value.
+static constexpr unsigned MaxOffsetDepth = 8;
+
+/// Returns bounds on how much \p V exceeds the header phi \p Phi of \p L in
+/// the iteration that computes V, if every path through the iteration
+/// computes V by adding constants to Phi. With \p NoSignedWrap, each addition
+/// must be nsw, so that the bounds also hold between the sign extensions of V
+/// and Phi.
+static std::optional<Interval> offsetFromPhi(const Loop &L, const PHINode *Phi,
+                                             const Value *V, bool NoSignedWrap,
+                                             const DataLayout &DL,
+                                             unsigned Depth = 0) {
+  if (V == Phi)
+    return Interval{0, 0};
+  auto *I = dyn_cast<Instruction>(V);
+  if (!I || !L.contains(I) || Depth == MaxOffsetDepth)
+    return std::nullopt;
+
+  // A phi or select picks one of several values computed earlier in the
+  // iteration. A phi in the header would pick one from the previous
+  // iteration.
+  SmallVector<const Value *, 4> Choices;
+  if (auto *PN = dyn_cast<PHINode>(I)) {
+    if (PN->getParent() == L.getHeader())
+      return std::nullopt;
+    append_range(Choices, PN->incoming_values());
+  } else if (auto *Sel = dyn_cast<SelectInst>(I)) {
+    Choices = {Sel->getTrueValue(), Sel->getFalseValue()};
+  }
+  if (!Choices.empty()) {
+    std::optional<Interval> R;
+    for (const Value *Choice : Choices) {
+      std::optional<Interval> CR =
+          offsetFromPhi(L, Phi, Choice, NoSignedWrap, DL, Depth + 1);
+      if (!CR)
+        return std::nullopt;
+      if (R)
+        R = Interval{std::min(R->Lo, CR->Lo), std::max(R->Hi, CR->Hi)};
+      else
+        R = CR;
+    }
+    return R;
+  }
+
+  const Value *Base = nullptr;
+  std::optional<int64_t> Addend;
+  const APInt *C;
+  if (auto *GEP = dyn_cast<GetElementPtrInst>(I)) {
+    APInt Offset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
+    if (!GEP->accumulateConstantOffset(DL, Offset))
+      return std::nullopt;
+    Base = GEP->getPointerOperand();
+    Addend = Offset.trySExtValue();
+  } else if (match(I, m_c_Add(m_Value(Base), m_APInt(C))) &&
+             (!NoSignedWrap || I->hasNoSignedWrap())) {
+    Addend = C->trySExtValue();
+  }
+  if (isTooFar(Addend))
+    return std::nullopt;
+  std::optional<Interval> R =
+      offsetFromPhi(L, Phi, Base, NoSignedWrap, DL, Depth + 1);
+  if (!R)
+    return std::nullopt;
+  return Interval{R->Lo + *Addend, R->Hi + *Addend};
+}
+
+std::optional<AddressEvolution>
+RISCVBranchConditionPipelining::getTermEvolution(const LoopPlan &P,
+                                                 const SCEV *Term) {
+  if (SE->isLoopInvariant(Term, P.L))
+    return AddressEvolution{Term, 0, 0};
+
+  if (auto *AR = dyn_cast<SCEVAddRecExpr>(Term)) {
+    auto *Step = AR->getLoop() == P.L && AR->isAffine()
+                     ? dyn_cast<SCEVConstant>(AR->getStepRecurrence(*SE))
+                     : nullptr;
+    std::optional<int64_t> V =
+        Step ? Step->getAPInt().trySExtValue() : std::nullopt;
+    if (isTooFar(V))
+      return std::nullopt;
+    return AddressEvolution{AR->getStart(), *V, *V};
+  }
+
+  // Otherwise the term must be Scale * K or Scale * sext(K), where K is a
+  // header phi that each iteration changes by an amount within known bounds,
+  // such as a counter that only some iterations increment.
+  int64_t Scale = 1;
+  const SCEV *X = Term;
+  if (auto *Mul = dyn_cast<SCEVMulExpr>(X); Mul && Mul->getNumOperands() == 2) {
+    auto *C = dyn_cast<SCEVConstant>(Mul->getOperand(0));
+    std::optional<int64_t> V = C ? C->getAPInt().trySExtValue() : std::nullopt;
+    if (isTooFar(V))
+      return std::nullopt;
+    Scale = *V;
+    X = Mul->getOperand(1);
+  }
+  // The bounds survive sign extension only if K never wraps. Unextended, K
+  // is as wide as the address, which wraps along with it.
+  auto *Ext = dyn_cast<SCEVSignExtendExpr>(X);
+  if (Ext)
+    X = Ext->getOperand();
+  auto *U = dyn_cast<SCEVUnknown>(X);
+  auto *Phi = U ? dyn_cast<PHINode>(U->getValue()) : nullptr;
+  if (!Phi || Phi->getParent() != P.Header)
+    return std::nullopt;
+  std::optional<Interval> Change =
+      offsetFromPhi(*P.L, Phi, Phi->getIncomingValueForBlock(P.Latch),
+                    /*NoSignedWrap=*/Ext != nullptr, *DL);
+  if (!Change)
+    return std::nullopt;
+  std::optional<int64_t> MinStep = checkedMul(Scale, Change->Lo);
+  std::optional<int64_t> MaxStep = checkedMul(Scale, Change->Hi);
+  if (isTooFar(MinStep) || isTooFar(MaxStep))
+    return std::nullopt;
+  if (Scale < 0)
+    std::swap(MinStep, MaxStep);
+  // In iteration 0, K holds its value from the preheader.
+  ValueToSCEVMapTy Initial;
+  Initial[Phi] = SE->getSCEV(Phi->getIncomingValueForBlock(P.Preheader));
+  return AddressEvolution{SCEVParameterRewriter::rewrite(Term, *SE, Initial),
+                          *MinStep, *MaxStep};
+}
+
+std::optional<AddressEvolution>
+RISCVBranchConditionPipelining::getAddressEvolution(const LoopPlan &P,
+                                                    Value *Ptr) {
+  // Each term of a sum moves on its own.
+  const SCEV *S = SE->getSCEV(Ptr);
+  ArrayRef<const SCEV *> Terms = S;
+  if (auto *Add = dyn_cast<SCEVAddExpr>(S))
+    Terms = Add->operands();
+  SmallVector<const SCEV *, 4> Starts;
+  int64_t MinStep = 0, MaxStep = 0;
+  for (const SCEV *Term : Terms) {
+    std::optional<AddressEvolution> TermEv = getTermEvolution(P, Term);
+    if (!TermEv)
+      return std::nullopt;
+    Starts.push_back(TermEv->Start);
+    MinStep += TermEv->MinStep;
+    MaxStep += TermEv->MaxStep;
+  }
+  if (isTooFar(MinStep) || isTooFar(MaxStep))
+    return std::nullopt;
+  return AddressEvolution{SE->getAddExpr(Starts), MinStep, MaxStep};
+}
+
 bool RISCVBranchConditionPipelining::isLoadMovableAcross(
     const LoopPlan &P, const PipelinedBranch &PB, LoadInst *Load,
     StoreInst *Store, unsigned Distance) {
@@ -419,36 +590,46 @@ bool RISCVBranchConditionPipelining::isLoadMovableAcross(
                                            TBAAOnly(Store))))
     return true;
 
-  // Otherwise both must step through memory in lockstep from a known
-  // distance apart.
-  auto *LoadAR =
-      dyn_cast<SCEVAddRecExpr>(SE->getSCEV(Load->getPointerOperand()));
-  auto *StoreAR =
-      dyn_cast<SCEVAddRecExpr>(SE->getSCEV(Store->getPointerOperand()));
-  if (!LoadAR || !StoreAR || LoadAR->getLoop() != P.L ||
-      StoreAR->getLoop() != P.L || !LoadAR->isAffine() ||
-      !StoreAR->isAffine())
+  // Otherwise both addresses must move predictably from a known distance
+  // apart. The load's advances by the same amount every iteration, while the
+  // store's may advance by another amount, or by one that varies within
+  // bounds.
+  std::optional<AddressEvolution> LoadEv =
+      getAddressEvolution(P, Load->getPointerOperand());
+  std::optional<AddressEvolution> StoreEv =
+      getAddressEvolution(P, Store->getPointerOperand());
+  if (!LoadEv || !StoreEv || LoadEv->MinStep != LoadEv->MaxStep)
     return false;
-  auto *LoadStep = dyn_cast<SCEVConstant>(LoadAR->getStepRecurrence(*SE));
-  auto *StoreStep = dyn_cast<SCEVConstant>(StoreAR->getStepRecurrence(*SE));
-  if (!LoadStep || !StoreStep ||
-      LoadStep->getAPInt() != StoreStep->getAPInt())
-    return false;
-  auto *Start = dyn_cast<SCEVConstant>(
-      SE->getMinusSCEV(LoadAR->getStart(), StoreAR->getStart()));
+  auto *Start =
+      dyn_cast<SCEVConstant>(SE->getMinusSCEV(LoadEv->Start, StoreEv->Start));
   if (!Start)
     return false;
   TypeSize LoadSize = DL->getTypeStoreSize(Load->getType());
   TypeSize StoreSize = DL->getTypeStoreSize(Store->getValueOperand()->getType());
   if (LoadSize.isScalable() || StoreSize.isScalable())
     return false;
-  std::optional<int64_t> Step = LoadStep->getAPInt().trySExtValue();
+  int64_t Step = LoadEv->MinStep;
   std::optional<int64_t> Offset = Start->getAPInt().trySExtValue();
-  auto TooFar = [](std::optional<int64_t> V) {
-    return !V || *V > MaxCheckedOffset || *V < -MaxCheckedOffset;
-  };
-  if (TooFar(Step) || TooFar(Offset))
+  if (isTooFar(Offset))
     return false;
+
+  // From iteration 0 to the store's iteration t, the load's address gains
+  // between (Step - MaxStep) * t and (Step - MinStep) * t bytes on the
+  // store's. Unless the two always advance alike, that needs a bound on t.
+  int64_t MinGain = 0, MaxGain = 0;
+  if (StoreEv->MinStep != Step || StoreEv->MaxStep != Step) {
+    auto *MaxBTC =
+        dyn_cast<SCEVConstant>(SE->getConstantMaxBackedgeTakenCount(P.L));
+    if (!MaxBTC || MaxBTC->getAPInt().getActiveBits() >= 64)
+      return false;
+    int64_t MaxT = MaxBTC->getAPInt().getZExtValue();
+    std::optional<int64_t> Lo = checkedMul(Step - StoreEv->MaxStep, MaxT);
+    std::optional<int64_t> Hi = checkedMul(Step - StoreEv->MinStep, MaxT);
+    if (!Lo || !Hi)
+      return false;
+    MinGain = std::min<int64_t>(*Lo, 0);
+    MaxGain = std::max<int64_t>(*Hi, 0);
+  }
 
   // The load of iteration J now runs at the end of the branch's block in
   // iteration J - Distance, so it moves across the store of iteration
@@ -467,10 +648,15 @@ bool RISCVBranchConditionPipelining::isLoadMovableAcross(
     if ((T == 0 && !StorePrecedesLoad) ||
         (T == Distance && !StoreFollowsBranch))
       continue;
-    // The load's address less the store's.
-    int64_t Delta = *Offset + *Step * int64_t(T);
-    if (Delta < int64_t(StoreSize.getFixedValue()) &&
-        Delta + int64_t(LoadSize.getFixedValue()) > 0)
+    // The load's address less the store's, computed without wrapping, lies
+    // in [Lo, Hi]. As long as that range fits in 64 bits, the accesses can
+    // only overlap if the difference is in (-LoadSize, StoreSize).
+    int64_t Delta = *Offset + Step * int64_t(T);
+    std::optional<int64_t> Lo = checkedAdd(Delta, MinGain);
+    std::optional<int64_t> Hi = checkedAdd(Delta, MaxGain);
+    if (!Lo || !Hi ||
+        (*Lo < int64_t(StoreSize.getFixedValue()) &&
+         *Hi > -int64_t(LoadSize.getFixedValue())))
       return false;
   }
   return true;
