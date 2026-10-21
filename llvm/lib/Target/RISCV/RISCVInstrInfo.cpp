@@ -565,7 +565,7 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   }
 
 // Branch Reg Copy
-  if (RISCV::PBRRegClass.contains(DstReg, SrcReg)) 
+  if (RISCV::PBRRegClass.contains(DstReg, SrcReg))
     report_fatal_error("PBR-to-PBR copy not supported");
 
 
@@ -642,7 +642,6 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     return;
   }
 
-  
   llvm_unreachable("Impossible reg-to-reg copy");
 }
 
@@ -672,10 +671,9 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
     Opcode = RISCV::FSW;
   } else if (RISCV::FPR64RegClass.hasSubClassEq(RC)) {
     Opcode = RISCV::FSD;
-  } else if (RISCV::PBRRegClass.hasSubClassEq(RC)) {   // BPUSH
+  } else if (RISCV::PBRRegClass.hasSubClassEq(RC)) {
     Opcode = RISCV::BPUSH;
-  } 
-  else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
+  } else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
     Opcode = RISCV::VS1R_V;
   } else if (RISCV::VRM2RegClass.hasSubClassEq(RC)) {
     Opcode = RISCV::VS2R_V;
@@ -760,9 +758,8 @@ void RISCVInstrInfo::loadRegFromStackSlot(
   } else if (RISCV::FPR64RegClass.hasSubClassEq(RC)) {
     Opcode = RISCV::FLD;
   }  else if (RISCV::PBRRegClass.hasSubClassEq(RC)) {
-    Opcode = RISCV::BPOP;   // BPOP
-  } 
-  else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
+    Opcode = RISCV::BPOP;
+  } else if (RISCV::VRRegClass.hasSubClassEq(RC)) {
     Opcode = RISCV::VL1RE8_V;
   } else if (RISCV::VRM2RegClass.hasSubClassEq(RC)) {
     Opcode = RISCV::VL2RE8_V;
@@ -1166,6 +1163,19 @@ RISCVCC::CondCode RISCVCC::getOppositeBranchCondition(RISCVCC::CondCode CC) {
   }
 }
 
+/// A PseudoNSQBR consumes a condition that pushes elsewhere put on its queue,
+/// so removing it would hand every later execution the wrong condition.
+/// Branch folding and updateTerminator remove a conditional branch whose
+/// edges reach the same block; describe the branch only while its edges
+/// differ, so those passes see an unanalyzable block instead.
+static bool canAnalyzeQueueBranch(const MachineBasicBlock &MBB) {
+  SmallPtrSet<const MachineBasicBlock *, 2> Succs;
+  for (const MachineBasicBlock *Succ : MBB.successors())
+    if (!Succ->isEHPad())
+      Succs.insert(Succ);
+  return Succs.size() >= 2;
+}
+
 bool RISCVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
                                    MachineBasicBlock *&TBB,
                                    MachineBasicBlock *&FBB,
@@ -1228,6 +1238,8 @@ bool RISCVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
     // We can't handle branches that have already been expanded
     if (I->getOpcode() == RISCV::PseudoPBC)
       return true; // TODO: non-spec: maybe special case here?
+    if (I->getOpcode() == RISCV::PseudoNSQBR && !canAnalyzeQueueBranch(MBB))
+      return true;
     parseCondBranch(*I, TBB, Cond);
     return false;
   }
@@ -1239,6 +1251,9 @@ bool RISCVInstrInfo::analyzeBranch(MachineBasicBlock &MBB,
     if (I->getOpcode() == RISCV::PseudoPBU || std::prev(I)->getOpcode() == RISCV::PseudoPBC
       || std::prev(I)->getOpcode() == RISCV::PseudoLoopEnd)
       return true; // TODO: non-spec: maybe special case here?
+    if (std::prev(I)->getOpcode() == RISCV::PseudoNSQBR &&
+        !canAnalyzeQueueBranch(MBB))
+      return true;
     parseCondBranch(*std::prev(I), TBB, Cond);
     FBB = getBranchDestBlock(*I);
     return false;
@@ -1283,6 +1298,7 @@ unsigned RISCVInstrInfo::removeBranch(MachineBasicBlock &MBB,
 // Inserts a branch into the end of the specific MachineBasicBlock, returning
 // the number of instructions inserted.
 // NOTE(non-spec): Cond is the operands of a conditional branch, [Opcode, rs1, rs2]
+// or, for a queued branch, [PseudoNSQBR, queue, inverted].
 unsigned RISCVInstrInfo::insertBranch(
     MachineBasicBlock &MBB, MachineBasicBlock *TBB, MachineBasicBlock *FBB,
     ArrayRef<MachineOperand> Cond, const DebugLoc &DL, int *BytesAdded) const {
@@ -1410,6 +1426,10 @@ bool RISCVInstrInfo::reverseBranchCondition(
     break;
   case RISCV::PseudoBRGEU:
     Cond[0].setImm(RISCV::PseudoBRLTU);
+    break;
+  case RISCV::PseudoNSQBR:
+    // [PseudoNSQBR, queue, inverted]
+    Cond[2].setImm(!Cond[2].getImm());
     break;
   case RISCV::CV_BEQIMM:
     Cond[0].setImm(RISCV::CV_BNEIMM);
@@ -1677,6 +1697,7 @@ bool RISCVInstrInfo::isBranchOffsetInRange(unsigned BranchOp,
   case RISCV::PseudoLoopEnd:
   case RISCV::PseudoPBC:
   case RISCV::PseudoPBU:
+  case RISCV::PseudoNSQBR:
   // TODO(non-spec,mitch): Don't think this is right..
     return true;
   }
@@ -3538,6 +3559,15 @@ RISCVInstrInfo::getOutliningTypeImpl(const MachineModuleInfo &MMI,
   const TargetRegisterInfo *TRI =
       MBB->getParent()->getSubtarget().getRegisterInfo();
   const auto &F = MI.getMF()->getFunction();
+
+  // The pushes and the branch of a condition queue name it by number, and
+  // expansion pairs them within one function.
+  switch (MI.getOpcode()) {
+  case RISCV::PseudoNSQInit:
+  case RISCV::PseudoNSQPush:
+  case RISCV::PseudoNSQBR:
+    return outliner::InstrType::Illegal;
+  }
 
   // We can manually strip out CFI instructions later.
   if (MI.isCFIInstruction())
