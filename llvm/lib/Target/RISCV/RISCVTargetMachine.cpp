@@ -610,7 +610,7 @@ void RISCVPassConfig::addPreEmitPass2() {
   }));
 
   addPass(createRISCVBranchSetupHoistingPass());
-  addPass(createFastRegisterAllocator());
+  addPass(createGreedyRegisterAllocator());
   addPass(createVirtRegRewriter());
 }
 
