@@ -200,6 +200,16 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
         return false;
   }
 
+  // Renumbering a callee-saved branch register would invalidate its
+  // prologue/epilogue save, including when it is live across a call.
+  const MCPhysReg *CalleeSavedRegs = TRI->getCalleeSavedRegs(&MF);
+  for (const BranchWork &W : WorkList) {
+    Register Reg = W.S->getOperand(0).getReg();
+    for (const MCPhysReg *CSR = CalleeSavedRegs; *CSR; ++CSR)
+      if (Reg == Register(*CSR))
+        return false;
+  }
+
   bool Changed = false;
   for (auto [BranchIdx, W] : llvm::enumerate(WorkList)) {
     Register NewReg = Register(RISCV::B0 + static_cast<unsigned>(BranchIdx));
