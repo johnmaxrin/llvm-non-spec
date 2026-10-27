@@ -65,16 +65,18 @@ public:
                            MachineInstr *C);
   /// Repair the live-in lists for the B-register of one branch's setup chain.
   /// Must run after all of that chain's setups have been placed.
-  void addBranchRegisterLiveIns(MachineInstr *S, MachineInstr *C,
-                                MachineInstr *T, MachineInstr *MI) const;
+  void addBranchRegisterLiveIns(MachineInstr *S,
+                                ArrayRef<MachineInstr *> Users) const;
   /// Returns the block to hoist \p SetupMI into and the insertion point
   /// within it. The iterator may be that block's end(), so it must not be
   /// dereferenced to recover the block.
+  /// \p OwnBranch, if set, is the branch reading \p SetupMI, which does not
+  /// stop it from being hoisted.
   std::pair<MachineBasicBlock *, MachineBasicBlock::iterator>
-  findEarliestSafePoint(MachineInstr &SetupMI,
-                        SmallSet<MachineInstr *, 4> Setup);
+  findEarliestSafePoint(MachineInstr &SetupMI, const MachineInstr *OwnBranch);
   bool isSafeToHoistTo(const MachineInstr &SetupMI, MachineBasicBlock &DestBB,
-                       MachineBasicBlock::const_iterator InsertPt) const;
+                       MachineBasicBlock::const_iterator InsertPt,
+                       const MachineInstr *OwnBranch) const;
 };
 
 char RISCVBranchSetupHoisting::ID = 0;
@@ -109,9 +111,11 @@ static void printMachineCFG(const MachineFunction &MF) {
 ///
 /// \p DefBB must dominate \p UseBB. That is what bounds the walk: every path
 /// reaching \p UseBB passes through \p DefBB, so stopping there cannot leave a
-/// reaching path unmarked.
+/// reaching path unmarked. Paths from unreachable blocks never execute, so
+/// they are not followed.
 static void markLiveInOnPathsFrom(MachineBasicBlock *DefBB,
-                                  MachineBasicBlock *UseBB, MCRegister Reg) {
+                                  MachineBasicBlock *UseBB, MCRegister Reg,
+                                  const MachineDominatorTree &MDT) {
   if (DefBB == UseBB)
     return;
 
@@ -120,7 +124,8 @@ static void markLiveInOnPathsFrom(MachineBasicBlock *DefBB,
 
   while (!WorkList.empty()) {
     MachineBasicBlock *BB = WorkList.pop_back_val();
-    if (BB == DefBB || !Visited.insert(BB).second)
+    if (BB == DefBB || !MDT.isReachableFromEntry(BB) ||
+        !Visited.insert(BB).second)
       continue;
 
     assert(!BB->pred_empty() &&
@@ -134,10 +139,24 @@ static void markLiveInOnPathsFrom(MachineBasicBlock *DefBB,
   }
 }
 
-void RISCVBranchSetupHoisting::addBranchRegisterLiveIns(MachineInstr *S,
-                                                        MachineInstr *C,
-                                                        MachineInstr *T,
-                                                        MachineInstr *MI) const {
+/// Whether \p MI appends to its B-register's condition FIFO.
+static bool pushesCondition(const MachineInstr &MI) {
+  switch (MI.getOpcode()) {
+  case RISCV::BMOVC_BEQ:
+  case RISCV::BMOVC_BNE:
+  case RISCV::BMOVC_BLT:
+  case RISCV::BMOVC_BGE:
+  case RISCV::BMOVC_BLTU:
+  case RISCV::BMOVC_BGEU:
+  case RISCV::BMOVC_BITS:
+    return true;
+  default:
+    return false;
+  }
+}
+
+void RISCVBranchSetupHoisting::addBranchRegisterLiveIns(
+    MachineInstr *S, ArrayRef<MachineInstr *> Users) const {
   MCRegister Reg = S->getOperand(0).getReg().asMCReg();
   MachineBasicBlock *DefBB = S->getParent();
 
@@ -145,12 +164,12 @@ void RISCVBranchSetupHoisting::addBranchRegisterLiveIns(MachineInstr *S,
   // PB branch reads it outright, so each one is a use to be covered. Walking
   // from every use back to the BMOVS block also covers the blocks between two
   // setups, because all of them are dominated by that block.
-  for (MachineInstr *Use : {C, T, MI}) {
-    if (!Use)
+  for (MachineInstr *Use : Users) {
+    if (Use == S)
       continue;
     assert(MDT->dominates(DefBB, Use->getParent()) &&
            "BMOVS must dominate every read of its B-register");
-    markLiveInOnPathsFrom(DefBB, Use->getParent(), Reg);
+    markLiveInOnPathsFrom(DefBB, Use->getParent(), Reg, *MDT);
   }
 }
 
@@ -176,15 +195,42 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
   struct BranchWork {
     MachineInstr *MI;
     MachineInstr *S, *T, *C;
+    /// Every instruction that reads or writes the branch's B-register.
+    SmallVector<MachineInstr *, 8> Users;
+    /// Whether several BMOVCs fill the B-register's condition FIFO, as for a
+    /// queue from RISCVBranchConditionPipelining. C is then only the BMOVC
+    /// nearest the branch.
+    bool IsQueue = false;
   };
   SmallVector<BranchWork, 16> WorkList;
 
+  const MachineRegisterInfo &MRI = MF.getRegInfo();
   for (auto &MBB : MF) {
     for (auto &MI : MBB) {
       if (RISCVBranchSetup BS = BSI->Branches.lookup(&MI)) {
-        WorkList.push_back({&MI, const_cast<MachineInstr *>(BS.S),
-                            const_cast<MachineInstr *>(BS.T),
-                            const_cast<MachineInstr *>(BS.C)});
+        BranchWork W = {&MI,
+                        const_cast<MachineInstr *>(BS.S),
+                        const_cast<MachineInstr *>(BS.T),
+                        const_cast<MachineInstr *>(BS.C),
+                        {}};
+        // RISCVExpandPseudo gives each branch a fresh virtual B-register,
+        // so its users are exactly the instructions of this branch.
+        if (BS.S && BS.S->getOperand(0).getReg().isVirtual()) {
+          // A BMOVC both reads and writes the register, so it can come up
+          // twice.
+          Register Reg = BS.S->getOperand(0).getReg();
+          for (MachineInstr &UseMI : MRI.reg_instructions(Reg))
+            if (!llvm::is_contained(W.Users, &UseMI))
+              W.Users.push_back(&UseMI);
+          W.IsQueue = llvm::count_if(W.Users, [](const MachineInstr *U) {
+                        return pushesCondition(*U);
+                      }) > 1;
+        } else {
+          for (MachineInstr *U : {W.S, W.C, W.T, W.MI})
+            if (U)
+              W.Users.push_back(U);
+        }
+        WorkList.push_back(std::move(W));
       }
     }
   }
@@ -215,24 +261,25 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
     Register NewReg = Register(RISCV::B0 + static_cast<unsigned>(BranchIdx));
     Register OldReg = W.S->getOperand(0).getReg();
 
-    auto Rewrite = [&](MachineInstr *SetupMI) {
-      if (!SetupMI)
-        return;
+    // Rewrite every user, not just S/C/T/MI: a queue has more BMOVCs than C,
+    // and one left virtual would be given another B-register.
+    for (MachineInstr *SetupMI : W.Users) {
       for (MachineOperand &MO : SetupMI->operands()) {
         if (MO.isReg() && MO.getReg() == OldReg) {
           MO.setReg(NewReg);
           Changed = true;
         }
       }
-    };
-
-    Rewrite(W.S);
-    Rewrite(W.C);
-    Rewrite(W.T);
-    Rewrite(W.MI);
+    }
   }
 
   for (BranchWork &W : llvm::reverse(WorkList)) {
+    // A queue's BMOVCs run iterations ahead of its branch, and its BMOVS and
+    // BMOVT empty the FIFO, so they must stay where the pipeliner put them:
+    // moved above another entry to the loop, they would leave the previous
+    // run's surplus conditions queued.
+    if (W.IsQueue)
+      continue;
     Changed |= scheduleBranchSetup(W.MI, W.S, W.T, W.C);
   }
 
@@ -243,7 +290,7 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
   // else in the pipeline will fill these lists in for us.
   if (MF.getRegInfo().tracksLiveness())
     for (const BranchWork &W : WorkList)
-      addBranchRegisterLiveIns(W.S, W.C, W.T, W.MI);
+      addBranchRegisterLiveIns(W.S, W.Users);
 
   LLVM_DEBUG(printMachineCFG(MF));
 
@@ -270,7 +317,12 @@ bool RISCVBranchSetupHoisting::scheduleBranchSetup(MachineInstr *MI,
   assert(T && "Branch must have BMOVT");
   bool Changed = false;
 
-  SmallSet<MachineInstr *, 4> Setups{{MI, S, T, C}};
+  // A PB reading its B-register is normally what keeps the setup in the
+  // loop around it, executing again before every iteration's PB. An
+  // unconditional branch's register does not change once set up, as its PB
+  // consumes nothing, so it can be set up once before the loop instead.
+  const MachineInstr *OwnBranch =
+      !C && MI->getOpcode() == RISCV::PseudoPBU ? MI : nullptr;
 
   // Keep architectural setup order. The dependency checks also prevent a
   // later setup from being moved across an earlier setup of the same B-reg.
@@ -280,7 +332,7 @@ bool RISCVBranchSetupHoisting::scheduleBranchSetup(MachineInstr *MI,
 
     LLVM_DEBUG(dbgs() << "Hoisting: " << *SetupMI);
 
-    auto [DestBB, InsertPt] = findEarliestSafePoint(*SetupMI, Setups);
+    auto [DestBB, InsertPt] = findEarliestSafePoint(*SetupMI, OwnBranch);
     if (InsertPt != SetupMI->getIterator()) {
       DestBB->splice(InsertPt, SetupMI->getParent(), SetupMI);
       ++NumBMOVHoisted;
@@ -311,7 +363,10 @@ static bool hasRegisterDependency(const MachineInstr &MI,
 }
 
 static bool isHoistHazard(const MachineInstr &MI, const MachineInstr &SetupMI,
-                          const TargetRegisterInfo &TRI) {
+                          const TargetRegisterInfo &TRI,
+                          const MachineInstr *OwnBranch) {
+  if (&MI == OwnBranch)
+    return false;
   return isHoistBarrier(MI) || hasRegisterDependency(MI, SetupMI, TRI);
 }
 
@@ -322,7 +377,7 @@ static MachineBasicBlock::iterator
 scanBlockBackward(MachineBasicBlock *BB,
                   MachineBasicBlock::reverse_iterator From,
                   const MachineInstr &SetupMI, const TargetRegisterInfo &TRI,
-                  bool &HazardFound) {
+                  const MachineInstr *OwnBranch, bool &HazardFound) {
   HazardFound = false;
 
   // Try to hoist to the top of the func.
@@ -334,7 +389,7 @@ scanBlockBackward(MachineBasicBlock *BB,
     if (CurrMI.isPHI())
       break;
 
-    if (isHoistHazard(CurrMI, SetupMI, TRI)) {
+    if (isHoistHazard(CurrMI, SetupMI, TRI, OwnBranch)) {
       LLVM_DEBUG(dbgs() << "  [Hazard] Cannot cross: " << CurrMI);
       LLVM_DEBUG(if (CurrMI.isCall()) dbgs() << "    - reason: Call");
       LLVM_DEBUG(if (CurrMI.isIndirectBranch()) dbgs()
@@ -356,7 +411,8 @@ scanBlockBackward(MachineBasicBlock *BB,
 
 bool RISCVBranchSetupHoisting::isSafeToHoistTo(
     const MachineInstr &SetupMI, MachineBasicBlock &DestBB,
-    MachineBasicBlock::const_iterator InsertPt) const {
+    MachineBasicBlock::const_iterator InsertPt,
+    const MachineInstr *OwnBranch) const {
   const MachineBasicBlock *SrcBB = SetupMI.getParent();
   if (SrcBB == &DestBB || !MDT->dominates(&DestBB, SrcBB))
     return false;
@@ -365,7 +421,8 @@ bool RISCVBranchSetupHoisting::isSafeToHoistTo(
                             MachineBasicBlock::const_iterator End) {
     return llvm::any_of(
         llvm::make_range(Begin, End), [&](const MachineInstr &MI) {
-          return &MI != &SetupMI && isHoistHazard(MI, SetupMI, *TRI);
+          return &MI != &SetupMI &&
+                 isHoistHazard(MI, SetupMI, *TRI, OwnBranch);
         });
   };
 
@@ -407,7 +464,7 @@ bool RISCVBranchSetupHoisting::isSafeToHoistTo(
 
 static bool loopHasHazard(const MachineLoop &L, const MachineInstr &SetupMI,
                           const TargetRegisterInfo &TRI,
-                          SmallSet<MachineInstr *, 4> Setup) {
+                          const MachineInstr *OwnBranch) {
   Register BR = SetupMI.getOperand(0).getReg();
   for (MachineBasicBlock *MBB : L.getBlocks()) {
     for (const MachineInstr &MI : *MBB) {
@@ -415,11 +472,7 @@ static bool loopHasHazard(const MachineLoop &L, const MachineInstr &SetupMI,
         if (MI.getOperand(0).getReg() == BR)
           continue;
       }
-      // if (Setup.contains(&MI)) {
-      //   dbgs() << "  Skipping MI: " << MI;
-      //   continue;
-      // }
-      bool IsHazard = isHoistHazard(MI, SetupMI, TRI);
+      bool IsHazard = isHoistHazard(MI, SetupMI, TRI, OwnBranch);
       LLVM_DEBUG(dbgs() << "  Checking loop MI (isHazard=" << IsHazard << "): " << MI);
       if (IsHazard) {
         return true;
@@ -433,7 +486,7 @@ static bool loopHasHazard(const MachineLoop &L, const MachineInstr &SetupMI,
 
 std::pair<MachineBasicBlock *, MachineBasicBlock::iterator>
 RISCVBranchSetupHoisting::findEarliestSafePoint(
-    MachineInstr &SetupMI, SmallSet<MachineInstr *, 4> Setup) {
+    MachineInstr &SetupMI, const MachineInstr *OwnBranch) {
 
   MachineBasicBlock *CurBB = SetupMI.getParent();
   MachineBasicBlock::iterator SafePoint = SetupMI.getIterator();
@@ -443,7 +496,8 @@ RISCVBranchSetupHoisting::findEarliestSafePoint(
   auto IntraStart = std::next(SetupMI.getReverseIterator());
   if (IntraStart != CurBB->rend())
     SafePoint =
-        scanBlockBackward(CurBB, IntraStart, SetupMI, *TRI, HazardFound);
+        scanBlockBackward(CurBB, IntraStart, SetupMI, *TRI, OwnBranch,
+                          HazardFound);
   else
     SafePoint = CurBB->getFirstNonPHI();
 
@@ -486,12 +540,13 @@ RISCVBranchSetupHoisting::findEarliestSafePoint(
       HazardFound = false;
     } else {
       IDomSafePoint =
-          scanBlockBackward(IDom, IDomScanStart, SetupMI, *TRI, HazardFound);
+          scanBlockBackward(IDom, IDomScanStart, SetupMI, *TRI, OwnBranch,
+                            HazardFound);
     }
 
     // The dominator tree chooses candidates; the inverse-CFG walk proves that
     // every actual path from the candidate to SetupMI is free of hazards.
-    if (!isSafeToHoistTo(SetupMI, *IDom, IDomSafePoint)) {
+    if (!isSafeToHoistTo(SetupMI, *IDom, IDomSafePoint, OwnBranch)) {
       LLVM_DEBUG(dbgs() << "  [Stop] Hazard on a CFG path from BB#"
                         << CurBB->getNumber() << " to BB#" << IDom->getNumber()
                         << "\n");
@@ -501,7 +556,7 @@ RISCVBranchSetupHoisting::findEarliestSafePoint(
     for (MachineLoop *L = MLI->getLoopFor(BB); L && !L->contains(IDom);
          L = L->getParentLoop()) {
       LLVM_DEBUG(dbgs() << "  Checking loop hazard...\n");
-      if (loopHasHazard(*L, SetupMI, *TRI, Setup)) {
+      if (loopHasHazard(*L, SetupMI, *TRI, OwnBranch)) {
         goto EndSearch;
       }
     }

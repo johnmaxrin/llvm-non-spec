@@ -9,6 +9,10 @@ Non-speculative RISCV modification to the [LLVM Project](https://github.com/llvm
 	- See RISCVExpandPseudoInsts.cpp
 - Added Branch Support Analysis pass (used to emit PBAL labels)
 	- See RISCVBranchSupportAnalysis.{h,cpp} and RISCVAsmPrinter.cpp
+- Added Branch Condition Pipelining pass (software pipelining of loop branch conditions)
+	- Pushes each in-loop branch's condition into its branch register's FIFO
+	  N iterations before the PB consumes it
+	- See RISCVBranchConditionPipelining.cpp and the llvm.riscv.ns.cond.* intrinsics
 	
 ## New Compiler Flags
 | Flag                                      | Description                                              |
@@ -16,6 +20,15 @@ Non-speculative RISCV modification to the [LLVM Project](https://github.com/llvm
 | `-riscv-ns-disable-hardware-loops`        | Disables BMOVC_LOOP transformation/emission              |
 | `-riscv-ns-disable-branch-setup-hoisting` | Disables BMOV hoisting optimization pass                 |
 | `-riscv-ns-disable-cross-bb-hoisting`     | Disables cross basic block hoisting of BMOV instructions |
+| `-riscv-ns-disable-software-pipelining`   | Disables branch condition pipelining                     |
+| `-riscv-ns-swp-distance=N`                | Iterations ahead to compute conditions (default 16, max 62) |
+
+Branch condition pipelining also has tuning limits: `-riscv-ns-swp-max-slice-size`,
+`-riscv-ns-swp-max-loop-size`, `-riscv-ns-swp-max-prologue-size` and
+`-riscv-ns-swp-max-function-branches`. To see which loops it pipelines, use
+`-pass-remarks=riscv-branch-condition-pipelining`, or
+`-debug-only=riscv-branch-condition-pipelining` for why it skips the others.
+From clang, pass these flags through `-mllvm`.
 
 
 ## My CMake Setup

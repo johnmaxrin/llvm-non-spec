@@ -1970,6 +1970,54 @@ def riscv_loop_end : SDNode<"RISCVISD::LOOP_END",
 def : Pat<(riscv_loop_end bb:$target),
           (PseudoLoopEnd bb:$target)>;
 
+/// Branch condition queues (see RISCVBranchConditionPipelining.cpp)
+
+// All three name their queue with $queue. RISCVExpandPseudo gives each queue
+// one branch register: PseudoNSQInit becomes the BMOVS/BMOVT of the queue's
+// only PseudoNSQBR, every PseudoNSQPush a BMOVC_* appending to it, and the
+// PseudoNSQBR the PB consuming it. Each consumes or produces queue state, so
+// none may be removed, reordered with another, or (for the branch, whose
+// address the BMOVS records) duplicated.
+let hasSideEffects = 1, mayLoad = 0, mayStore = 0 in {
+let Size = 8 in
+def PseudoNSQInit : Pseudo<(outs), (ins ixlenimm:$queue), []>;
+
+// $cc is a RISCVCC::CondCode.
+let Size = 4 in
+def PseudoNSQPush : Pseudo<(outs), (ins ixlenimm:$queue, GPR:$rs1, GPR:$rs2,
+                                        ixlenimm:$cc), []>;
+
+// Taken when the condition taken off the queue is true, or false if
+// $inverted is set. The inversion lets passes reverse the branch: expansion
+// inverts every push to the queue to match.
+let isBranch = 1, isTerminator = 1, isNotDuplicable = 1, Size = 4 in
+def PseudoNSQBR : Pseudo<(outs), (ins ixlenimm:$queue, ixlenimm:$inverted,
+                                      bare_simm13_lsb0_bb:$dst), []>;
+}
+
+def SDT_RISCVNSQInit : SDTypeProfile<0, 1, [SDTCisVT<0, XLenVT>]>;
+def SDT_RISCVNSQPush : SDTypeProfile<0, 4, [SDTCisVT<0, XLenVT>,
+                                            SDTCisVT<1, XLenVT>,
+                                            SDTCisVT<2, XLenVT>,
+                                            SDTCisVT<3, XLenVT>]>;
+def SDT_RISCVNSQBr : SDTypeProfile<0, 3, [SDTCisVT<0, XLenVT>,
+                                          SDTCisVT<1, XLenVT>,
+                                          SDTCisVT<2, OtherVT>]>;
+
+def riscv_ns_qinit : RVSDNode<"NS_QINIT", SDT_RISCVNSQInit,
+                              [SDNPHasChain, SDNPSideEffect]>;
+def riscv_ns_qpush : RVSDNode<"NS_QPUSH", SDT_RISCVNSQPush,
+                              [SDNPHasChain, SDNPSideEffect]>;
+def riscv_ns_qbr : RVSDNode<"NS_QBR", SDT_RISCVNSQBr,
+                            [SDNPHasChain, SDNPSideEffect]>;
+
+def : Pat<(riscv_ns_qinit timm:$queue), (PseudoNSQInit timm:$queue)>;
+def : Pat<(riscv_ns_qpush timm:$queue, (XLenVT GPR:$rs1), (XLenVT GPR:$rs2),
+                          timm:$cc),
+          (PseudoNSQPush timm:$queue, GPR:$rs1, GPR:$rs2, timm:$cc)>;
+def : Pat<(riscv_ns_qbr timm:$queue, timm:$inverted, bb:$dst),
+          (PseudoNSQBR timm:$queue, timm:$inverted, bare_simm13_lsb0_bb:$dst)>;
+
 
 // Pseudo for a rematerializable constant materialization sequence.
 // This is an experimental feature enabled by
