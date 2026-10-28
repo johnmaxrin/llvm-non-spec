@@ -218,6 +218,7 @@ void MachineRegisterInfo::clearVirtRegs() {
   }
 #endif
   VRegInfo.clear();
+  RegAllocHints.clear();
   for (auto &I : LiveIns)
     I.second = 0;
 }

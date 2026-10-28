@@ -1891,6 +1891,40 @@ let TargetPrefix = "riscv" in {
 let TargetPrefix = "riscv" in
 def int_riscv_pause : DefaultAttrsIntrinsic<[], [], [IntrNoMem, IntrHasSideEffects]>;
 
+// Non-Spec branch condition queues
+//===----------------------------------------------------------------------===//
+// A branch register's condition is a FIFO of bits: every bmovc_* appends one
+// and every pb consumes one. These intrinsics let RISCVBranchConditionPipelining
+// compute a branch's condition several loop iterations before the branch
+// executes. A queue is named by an immediate that is unique within the
+// function, and exactly one branch consumes it.
+let TargetPrefix = "riscv" in {
+  // void @llvm.riscv.ns.cond.init(i32 immarg queue)
+  // Empties the queue. It must execute before the first push.
+  def int_riscv_ns_cond_init
+      : DefaultAttrsIntrinsic<[], [llvm_i32_ty],
+                              [ImmArg<ArgIndex<0>>, IntrInaccessibleMemOnly,
+                               IntrHasSideEffects]>;
+
+  // void @llvm.riscv.ns.cond.push.<ixlen>(i32 immarg queue, i32 immarg pred,
+  //                                        ixlen lhs, ixlen rhs)
+  // Appends (icmp pred lhs, rhs) to the queue; pred is a CmpInst::Predicate.
+  def int_riscv_ns_cond_push
+      : DefaultAttrsIntrinsic<[],
+                              [llvm_i32_ty, llvm_i32_ty, llvm_anyint_ty,
+                               LLVMMatchType<0>],
+                              [ImmArg<ArgIndex<0>>, ImmArg<ArgIndex<1>>,
+                               IntrInaccessibleMemOnly, IntrHasSideEffects]>;
+
+  // i1 @llvm.riscv.ns.cond.pop(i32 immarg queue)
+  // Removes the oldest condition from the queue. The result must only be used
+  // as the condition of the br that ends the same block.
+  def int_riscv_ns_cond_pop
+      : DefaultAttrsIntrinsic<[llvm_i1_ty], [llvm_i32_ty],
+                              [ImmArg<ArgIndex<0>>, IntrInaccessibleMemOnly,
+                               IntrHasSideEffects]>;
+} // TargetPrefix = "riscv"
+
 // Vendor extensions
 //===----------------------------------------------------------------------===//
 include "llvm/IR/IntrinsicsRISCVXTHead.td"

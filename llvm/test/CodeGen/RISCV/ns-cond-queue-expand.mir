@@ -1,0 +1,35 @@
+# RUN: llc -mtriple=riscv64 -run-pass=riscv-expand-pseudo %s -o - | FileCheck %s
+
+# Each queue becomes one branch register, which its init sets up for its
+# branch and its pushes append to. The branch was inverted, so each push
+# tests the opposite condition. Nothing reads queue 5, so its push goes.
+
+---
+name:            expand
+tracksRegLiveness: true
+body:             |
+  ; CHECK-LABEL: name: expand
+  ; CHECK:       bb.0:
+  ; CHECK:         [[Q:%[0-9]+]]:pbr = BMOVS_J <mcsymbol {{.*}}>
+  ; CHECK-NEXT:    [[Q]]:pbr = BMOVT_J [[Q]], %bb.2
+  ; CHECK-NEXT:    [[Q]]:pbr = BMOVC_BGE [[Q]], $x10, $x11
+  ; CHECK-NEXT:    [[Q]]:pbr = BMOVC_BLTU [[Q]], $x11, $x10
+  ; CHECK-NOT:     BMOVC
+  ; CHECK:         PseudoPBC [[Q]], %bb.2
+  bb.0:
+    successors: %bb.1, %bb.2
+    liveins: $x10, $x11
+
+    PseudoNSQInit 3
+    PseudoNSQPush 3, $x10, $x11, 2
+    PseudoNSQPush 3, $x11, $x10, 5
+    PseudoNSQPush 5, $x10, $x11, 0
+    PseudoNSQBR 3, 1, %bb.2
+    PseudoBR %bb.1
+
+  bb.1:
+    PseudoRET
+
+  bb.2:
+    PseudoRET
+...

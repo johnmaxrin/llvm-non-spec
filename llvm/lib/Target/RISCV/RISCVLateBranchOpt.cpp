@@ -54,8 +54,10 @@ bool RISCVLateBranchOpt::runOnBasicBlock(MachineBasicBlock &MBB) const {
   if (!TBB || Cond.size() != 3)
     return false;
 
+  // A branch on a condition queue (PseudoNSQBR) compares nothing.
   RISCVCC::CondCode CC = RISCVInstrInfo::getCondFromBranchOpc(Cond[0].getImm());
-  assert(CC != RISCVCC::COND_INVALID);
+  if (CC == RISCVCC::COND_INVALID)
+    return false;
 
   MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
 

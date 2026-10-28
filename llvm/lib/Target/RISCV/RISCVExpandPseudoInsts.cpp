@@ -17,6 +17,7 @@
 #include "RISCVTargetMachine.h"
 
 #include "llvm/CodeGen/LivePhysRegs.h"
+#include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
@@ -39,6 +40,8 @@ class RISCVExpandPseudo : public MachineFunctionPass {
 public:
   const RISCVSubtarget *STI;
   const RISCVInstrInfo *TII;
+  const MachineLoopInfo *MLI;
+  const MachineDominatorTree *MDT;
   static char ID;
 
   RISCVExpandPseudo() : MachineFunctionPass(ID) {}
@@ -47,6 +50,8 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     MachineFunctionPass::getAnalysisUsage(AU);
+    AU.addRequired<MachineLoopInfoWrapperPass>();
+    AU.addRequired<MachineDominatorTreeWrapperPass>();
     AU.setPreservesAll();
   }
 
@@ -70,6 +75,12 @@ private:
                     MachineBasicBlock::iterator MBBI);
   bool expandIndirect(MachineBasicBlock &MBB,
                       MachineBasicBlock::iterator MBBI, bool IsCall) const;
+  bool expandLoopEnd(MachineBasicBlock &MBB,
+                     MachineBasicBlock::iterator MBBI);
+  void collectLoopSetups(MachineFunction &MF);
+  void collectCondQueues(MachineFunction &MF);
+  bool expandCondQueueOp(MachineBasicBlock &MBB,
+                         MachineBasicBlock::iterator MBBI);
   bool expandCCOp(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
                   MachineBasicBlock::iterator &NextMBBI);
   bool expandVMSET_VMCLR(MachineBasicBlock &MBB,
@@ -93,6 +104,19 @@ private:
     return Size;
   }
 #endif
+
+  /// A condition queue becomes the FIFO of one branch register: the one its
+  /// PseudoNSQBR reads.
+  struct CondQueue {
+    Register BReg;
+    MCSymbol *Sym;
+    MachineBasicBlock *Target;
+    bool Inverted;
+  };
+  /// The function's condition queues, by queue number.
+  DenseMap<int64_t, CondQueue> CondQueues;
+  /// The PseudoLoopSetup of each PseudoLoopEnd.
+  DenseMap<const MachineInstr *, MachineInstr *> LoopSetups;
 };
 
 class RISCVExpandLoopPseudo : public MachineFunctionPass {
@@ -122,10 +146,19 @@ char RISCVExpandLoopPseudo::ID = 0;
 bool RISCVExpandPseudo::runOnMachineFunction(MachineFunction &MF) {
   STI = &MF.getSubtarget<RISCVSubtarget>();
   TII = STI->getInstrInfo();
+  MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
+  MDT = &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
 
 #ifndef NDEBUG
   const unsigned OldSize = getInstSizeInBytes(MF);
 #endif
+
+  // Expansion splits blocks, leaving the loop and dominator information
+  // stale, so pair every loop end with its setup first. Likewise, a queue's
+  // pushes can come before its branch in layout order, so find every queue's
+  // branch register before expanding anything.
+  collectLoopSetups(MF);
+  collectCondQueues(MF);
 
   bool Modified = false;
   for (auto &MBB : MF)
@@ -136,6 +169,132 @@ bool RISCVExpandPseudo::runOnMachineFunction(MachineFunction &MF) {
   assert(OldSize >= NewSize);
 #endif
   return Modified;
+}
+
+void RISCVExpandPseudo::collectLoopSetups(MachineFunction &MF) {
+  LoopSetups.clear();
+  SmallPtrSet<MachineInstr *, 8> Paired;
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineInstr &MI : MBB) {
+      if (MI.getOpcode() != RISCV::PseudoLoopEnd)
+        continue;
+      // HardwareLoops puts the setup at the end of the preheader, but that
+      // block may since have been split, e.g. to lower a select hoisted into
+      // it, so search every block dominating the loop. The setup must run
+      // each time the loop is entered, so it is not outside the parent loop.
+      MachineLoop *ML = MLI->getLoopFor(&MBB);
+      assert(ML && "loop end outside a loop");
+      MachineInstr *Setup = nullptr;
+      for (MachineDomTreeNode *Node = MDT->getNode(ML->getHeader())->getIDom();
+           Node && !Setup; Node = Node->getIDom()) {
+        MachineBasicBlock *BB = Node->getBlock();
+        if (MLI->getLoopFor(BB) != ML->getParentLoop())
+          break;
+        for (MachineInstr &SetupMI : llvm::reverse(*BB)) {
+          if (SetupMI.getOpcode() == RISCV::PseudoLoopSetup) {
+            Setup = &SetupMI;
+            break;
+          }
+        }
+      }
+      if (!Setup || !Paired.insert(Setup).second)
+        report_fatal_error("hardware loop in " + MF.getName() +
+                           " has no PseudoLoopSetup of its own");
+      LoopSetups[&MI] = Setup;
+    }
+  }
+}
+
+void RISCVExpandPseudo::collectCondQueues(MachineFunction &MF) {
+  CondQueues.clear();
+  MachineRegisterInfo &MRI = MF.getRegInfo();
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineInstr &MI : MBB) {
+      if (MI.getOpcode() != RISCV::PseudoNSQBR)
+        continue;
+      CondQueue Q = {MRI.createVirtualRegister(&RISCV::PBRRegClass),
+                     MF.getContext().createTempSymbol("ns_q_"),
+                     MI.getOperand(2).getMBB(), MI.getOperand(1).getImm() != 0};
+      // The branch register records the address of one PB, so a second
+      // branch could never see the conditions pushed to the queue.
+      if (!CondQueues.try_emplace(MI.getOperand(0).getImm(), Q).second)
+        report_fatal_error("condition queue " +
+                           Twine(MI.getOperand(0).getImm()) +
+                           " is read by more than one branch");
+    }
+  }
+}
+
+static unsigned getBMOVCOpcode(RISCVCC::CondCode CC) {
+  switch (CC) {
+  default:
+    llvm_unreachable("unexpected condition code");
+  case RISCVCC::COND_EQ:
+    return RISCV::BMOVC_BEQ;
+  case RISCVCC::COND_NE:
+    return RISCV::BMOVC_BNE;
+  case RISCVCC::COND_LT:
+    return RISCV::BMOVC_BLT;
+  case RISCVCC::COND_GE:
+    return RISCV::BMOVC_BGE;
+  case RISCVCC::COND_LTU:
+    return RISCV::BMOVC_BLTU;
+  case RISCVCC::COND_GEU:
+    return RISCV::BMOVC_BGEU;
+  }
+}
+
+bool RISCVExpandPseudo::expandCondQueueOp(MachineBasicBlock &MBB,
+                                          MachineBasicBlock::iterator MBBI) {
+  MachineInstr &MI = *MBBI;
+  DebugLoc DL = MI.getDebugLoc();
+
+  auto It = CondQueues.find(MI.getOperand(0).getImm());
+  if (It == CondQueues.end()) {
+    // The branch reading this queue was deleted along with its unreachable
+    // block, so nothing will ever read what is pushed.
+    MI.eraseFromParent();
+    return true;
+  }
+  const CondQueue &Q = It->second;
+
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("not a condition queue pseudo");
+  case RISCV::PseudoNSQInit:
+    // Emit BMOVS Bq, ns_q_; BMOVT Bq, Target. Setting the source and target
+    // also empties the branch register's condition FIFO.
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVS_J))
+        .addDef(Q.BReg)
+        .addSym(Q.Sym);
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::BMOVT_J))
+        .addDef(Q.BReg)
+        .addReg(Q.BReg)
+        .addMBB(Q.Target);
+    break;
+  case RISCV::PseudoNSQPush: {
+    // Emit BMOVC_XX Bq, Rs1, Rs2, testing the opposite condition if the
+    // branch was reversed since selection.
+    auto CC = static_cast<RISCVCC::CondCode>(MI.getOperand(3).getImm());
+    if (Q.Inverted)
+      CC = RISCVCC::getOppositeBranchCondition(CC);
+    BuildMI(MBB, MBBI, DL, TII->get(getBMOVCOpcode(CC)))
+        .addDef(Q.BReg)
+        .addReg(Q.BReg)
+        .add(MI.getOperand(1))
+        .add(MI.getOperand(2));
+    break;
+  }
+  case RISCV::PseudoNSQBR:
+    // Emit conditional branch
+    BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBC))
+        .addReg(Q.BReg)
+        .addMBB(Q.Target);
+    break;
+  }
+
+  MI.eraseFromParent();
+  return true;
 }
 
 bool RISCVExpandPseudo::expandMBB(MachineBasicBlock &MBB) {
@@ -185,6 +344,12 @@ bool RISCVExpandPseudo::expandMI(MachineBasicBlock &MBB,
   case RISCV::PseudoCALLIndirectX7:
   case RISCV::PseudoCALLIndirectNonX7:
     return expandIndirect(MBB, MBBI, /*IsCall=*/true);
+  case RISCV::PseudoLoopEnd:
+    return expandLoopEnd(MBB, MBBI);
+  case RISCV::PseudoNSQInit:
+  case RISCV::PseudoNSQPush:
+  case RISCV::PseudoNSQBR:
+    return expandCondQueueOp(MBB, MBBI);
   case RISCV::PseudoMV_FPR16INX:
     return expandMV_FPR16INX(MBB, MBBI);
   case RISCV::PseudoMV_FPR32INX:
@@ -640,20 +805,11 @@ bool RISCVExpandPseudo::expandIndirect(MachineBasicBlock &MBB,
   return true;
 }
 
-static bool expandLoopEnd(MachineBasicBlock &MBB,
-                          MachineBasicBlock::iterator MBBI,
-                          const RISCVInstrInfo *TII,
-                          const MachineLoopInfo *MLI) {
-  MachineInstr *Setup = nullptr;
-  MachineLoop *ML = MLI->getLoopFor(&MBB);
-  assert(ML && "Loop end must be in a machine loop");
-  MachineBasicBlock *Preheader = ML->getLoopPreheader();
-  assert(Preheader && "Hardware loop must have a preheader");
-  for (MachineInstr &MI : *Preheader) {
-    if (MI.getOpcode() == RISCV::PseudoLoopSetup) {
-      Setup = &MI;
-    }
-  }
+bool RISCVExpandPseudo::expandLoopEnd(MachineBasicBlock &MBB,
+                                        MachineBasicBlock::iterator MBBI) {
+  // dbgs() << "expandLoopEnd: "; MBBI->dump();
+
+  MachineInstr *Setup = LoopSetups.lookup(&*MBBI);
   assert(Setup && "Loop end must also contain a setup");
 
   MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
