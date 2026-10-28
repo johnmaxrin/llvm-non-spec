@@ -1,0 +1,6 @@
+#ifndef CLANG_TOOLS_EXTRA_UNITTESTS_CLANG_DOC_CONFIG_H
+#define CLANG_TOOLS_EXTRA_UNITTESTS_CLANG_DOC_CONFIG_H
+
+#define CLANG_DOC_TEST_ASSET_DIR "/home/robert/scratch/llvm-non-spec/./bin/../share/clang-doc"
+
+#endif // CLANG_TOOLS_EXTRA_UNITTESTS_CLANG_DOC_CONFIG_H
