@@ -67,6 +67,9 @@ void initializeRISCVExpandPseudoPass(PassRegistry &);
 FunctionPass *createRISCVPreRAExpandPseudoPass();
 void initializeRISCVPreRAExpandPseudoPass(PassRegistry &);
 
+FunctionPass *createRISCVExpandLoopPseudoPass();
+void initializeRISCVExpandLoopPseudoPass(PassRegistry &);
+
 FunctionPass *createRISCVExpandAtomicPseudoPass();
 void initializeRISCVExpandAtomicPseudoPass(PassRegistry &);
 

@@ -27,8 +27,14 @@ using namespace llvm;
 
 #define RISCV_EXPAND_PSEUDO_NAME "RISC-V pseudo instruction expansion pass"
 #define RISCV_PRERA_EXPAND_PSEUDO_NAME "RISC-V Pre-RA pseudo instruction expansion pass"
+#define RISCV_EXPAND_LOOP_PSEUDO_NAME "RISC-V hardware loop expansion pass"
 
 namespace {
+
+static bool expandLoopEnd(MachineBasicBlock &MBB,
+                          MachineBasicBlock::iterator MBBI,
+                          const RISCVInstrInfo *TII,
+                          const MachineLoopInfo *MLI);
 
 class RISCVExpandPseudo : public MachineFunctionPass {
 public:
@@ -113,7 +119,29 @@ private:
   DenseMap<const MachineInstr *, MachineInstr *> LoopSetups;
 };
 
+class RISCVExpandLoopPseudo : public MachineFunctionPass {
+public:
+  const RISCVInstrInfo *TII;
+  const MachineLoopInfo *MLI;
+  static char ID;
+
+  RISCVExpandLoopPseudo() : MachineFunctionPass(ID) {}
+
+  bool runOnMachineFunction(MachineFunction &MF) override;
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    MachineFunctionPass::getAnalysisUsage(AU);
+    AU.addRequired<MachineLoopInfoWrapperPass>();
+    AU.setPreservesCFG();
+  }
+
+  StringRef getPassName() const override {
+    return RISCV_EXPAND_LOOP_PSEUDO_NAME;
+  }
+};
+
 char RISCVExpandPseudo::ID = 0;
+char RISCVExpandLoopPseudo::ID = 0;
 
 bool RISCVExpandPseudo::runOnMachineFunction(MachineFunction &MF) {
   STI = &MF.getSubtarget<RISCVSubtarget>();
@@ -783,38 +811,65 @@ bool RISCVExpandPseudo::expandLoopEnd(MachineBasicBlock &MBB,
 
   MachineInstr *Setup = LoopSetups.lookup(&*MBBI);
   assert(Setup && "Loop end must also contain a setup");
-  // dbgs() << "Found: "; Setup->dump();
 
   MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
-  Register BReg = MRI.createVirtualRegister(&RISCV::PBRRegClass);
+  Register BStart = MRI.createVirtualRegister(&RISCV::PBRRegClass);
+  Register BTarget = MRI.createVirtualRegister(&RISCV::PBRRegClass);
+  Register BLoop = MRI.createVirtualRegister(&RISCV::PBRRegClass);
   DebugLoc DL = MBBI->getDebugLoc();
   MCContext &Context = MBB.getParent()->getContext();
-  MCSymbol* Sym = Context.createTempSymbol("ns_loop_");
+  MCSymbol *Sym = Context.createTempSymbol("ns_loop_");
 
   MachineBasicBlock *TargetMBB = MBBI->getOperand(0).getMBB();
   Register Count = Setup->getOperand(0).getReg();
 
   // Emit BMOVS B0, ns_loop_
   BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(),
-    TII->get(RISCV::BMOVS_J))
-      .addDef(BReg).addSym(Sym);
+          TII->get(RISCV::BMOVS_J))
+      .addDef(BStart)
+      .addSym(Sym);
 
   // Emit BMOVT B0, Target
-  BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(), TII->get(RISCV::BMOVT_J))
-      .addDef(BReg).addReg(BReg).addMBB(TargetMBB);
+  BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(),
+          TII->get(RISCV::BMOVT_J))
+      .addDef(BTarget)
+      .addReg(BStart)
+      .addMBB(TargetMBB);
 
   // Emit BMOVC_LOOP B0, Rs1, 0
-  BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(), TII->get(RISCV::BMOVC_LOOP))
-      .addDef(BReg).addReg(BReg).addReg(Count).addImm(-1);
+  BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(),
+          TII->get(RISCV::BMOVC_LOOP))
+      .addDef(BLoop)
+      .addReg(BTarget)
+      .addReg(Count)
+      .addImm(-1);
 
   // Emit conditional branch
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBC))
-      .addReg(BReg).addMBB(TargetMBB);
+      .addReg(BLoop)
+      .addMBB(TargetMBB);
 
   Setup->eraseFromParent();
   MBBI->eraseFromParent();
 
   return true;
+}
+
+bool RISCVExpandLoopPseudo::runOnMachineFunction(MachineFunction &MF) {
+  TII = MF.getSubtarget<RISCVSubtarget>().getInstrInfo();
+  MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
+
+  bool Modified = false;
+  for (MachineBasicBlock &MBB : MF) {
+    for (MachineBasicBlock::iterator MBBI = MBB.begin(), E = MBB.end();
+         MBBI != E;) {
+      MachineBasicBlock::iterator Next = std::next(MBBI);
+      if (MBBI->getOpcode() == RISCV::PseudoLoopEnd)
+        Modified |= expandLoopEnd(MBB, MBBI, TII, MLI);
+      MBBI = Next;
+    }
+  }
+  return Modified;
 }
 
 bool RISCVExpandPseudo::expandMV_FPR32INX(MachineBasicBlock &MBB,
@@ -1180,12 +1235,18 @@ bool RISCVPreRAExpandPseudo::expandLoadTLSDescAddress(
 INITIALIZE_PASS(RISCVExpandPseudo, "riscv-expand-pseudo",
                 RISCV_EXPAND_PSEUDO_NAME, false, false)
 
+INITIALIZE_PASS(RISCVExpandLoopPseudo, "riscv-expand-loop-pseudo",
+                RISCV_EXPAND_LOOP_PSEUDO_NAME, false, false)
+
 INITIALIZE_PASS(RISCVPreRAExpandPseudo, "riscv-prera-expand-pseudo",
                 RISCV_PRERA_EXPAND_PSEUDO_NAME, false, false)
 
 namespace llvm {
 
 FunctionPass *createRISCVExpandPseudoPass() { return new RISCVExpandPseudo(); }
+FunctionPass *createRISCVExpandLoopPseudoPass() {
+  return new RISCVExpandLoopPseudo();
+}
 FunctionPass *createRISCVPreRAExpandPseudoPass() { return new RISCVPreRAExpandPseudo(); }
 
 } // end of namespace llvm

@@ -138,6 +138,7 @@ extern "C" LLVM_ABI LLVM_EXTERNAL_VISIBILITY void LLVMInitializeRISCVTarget() {
   initializeRISCVOptWInstrsPass(*PR);
   initializeRISCVFoldMemOffsetPass(*PR);
   initializeRISCVPreRAExpandPseudoPass(*PR);
+  initializeRISCVExpandLoopPseudoPass(*PR);
   initializeRISCVExpandPseudoPass(*PR);
   initializeRISCVVectorPeepholePass(*PR);
   initializeRISCVVLOptimizerPass(*PR);
@@ -644,6 +645,9 @@ void RISCVPassConfig::addPreRegAlloc() {
     addPass(&MachinePipelinerID);
 
   addPass(createRISCVLoopFissionDecomposedBranchPass()); // Loop Fission
+  // Expand loop pseudos before register allocation so branch-register values
+  // live across calls are visible to the call-preservation logic.
+  addPass(createRISCVExpandLoopPseudoPass());
   addPass(createRISCVVMV0EliminationPass());
 }
 
