@@ -215,6 +215,7 @@ bool RISCVLoopFissionDecomposedBranch::hasCrossIterationDependence(
       }
     }
   }
+  return false;
 }
 
 bool RISCVLoopFissionDecomposedBranch::buildSlice(
@@ -233,9 +234,11 @@ bool RISCVLoopFissionDecomposedBranch::buildSlice(
   while (!Work.empty()) {
     MachineInstr *Def = MRI.getVRegDef(Work.pop_back_val());
 
+    if (!Def)
+      continue; // live-in
     if (Def->getNumDefs() != 1) return false;
 
-    if (!Def || !L.contains(Def->getParent()))
+    if (!L.contains(Def->getParent()))
       continue; // loop invariant
     if (!Seen.insert(Def).second)
       continue;

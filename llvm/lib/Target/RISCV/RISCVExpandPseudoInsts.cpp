@@ -43,12 +43,11 @@ public:
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
-  // void getAnalysisUsage(AnalysisUsage &AU) const override {
-  //   MachineFunctionPass::getAnalysisUsage(AU);
-  //   AU.addRequired<MachineLoopInfoWrapperPass>();
-  //   AU.addRequired<MachineDominatorTreeWrapperPass>();
-  //   AU.setPreservesAll();
-  // }
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    MachineFunctionPass::getAnalysisUsage(AU);
+    AU.addRequired<MachineLoopInfoWrapperPass>();
+    AU.addRequired<MachineDominatorTreeWrapperPass>();
+  }
 
   //StringRef getPassName() const override { return RISCV_EXPAND_PSEUDO_NAME; }
 
