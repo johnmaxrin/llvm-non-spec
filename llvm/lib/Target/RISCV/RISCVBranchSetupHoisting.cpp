@@ -63,6 +63,7 @@ public:
 
   bool scheduleBranchSetup(MachineInstr *MI, MachineInstr *S, MachineInstr *T,
                            MachineInstr *C);
+  bool repairBranchTargets(const MachineFunction &MF) const;
   /// Repair the live-in lists for the B-register of one branch's setup chain.
   /// Must run after all of that chain's setups have been placed.
   void addBranchRegisterLiveIns(MachineInstr *S,
@@ -80,6 +81,42 @@ public:
 };
 
 char RISCVBranchSetupHoisting::ID = 0;
+
+bool RISCVBranchSetupHoisting::repairBranchTargets(
+    const MachineFunction &MF) const {
+  DenseMap<MachineInstr *, MachineBasicBlock *> Targets;
+  SmallPtrSet<MachineInstr *, 16> ConflictingTargets;
+
+  for (const auto &[Branch, Setup] : BSI->Branches) {
+    if (!Setup.T || Setup.T->getOpcode() != RISCV::BMOVT_J ||
+        Branch->getNumExplicitOperands() < 2 ||
+        !Branch->getOperand(1).isMBB())
+      continue;
+
+    MachineInstr *TargetSetup = const_cast<MachineInstr *>(Setup.T);
+    MachineBasicBlock *Target = Branch->getOperand(1).getMBB();
+    auto [It, Inserted] = Targets.try_emplace(TargetSetup, Target);
+    if (!Inserted && It->second != Target)
+      ConflictingTargets.insert(TargetSetup);
+  }
+
+  bool Changed = false;
+  for (const auto &[TargetSetup, Target] : Targets) {
+    if (ConflictingTargets.contains(TargetSetup))
+      report_fatal_error("RISC-V branch setup is shared by branches with "
+                         "different targets");
+
+    MachineOperand &TargetOperand = TargetSetup->getOperand(2);
+    if (!TargetOperand.isMBB() || TargetOperand.getMBB() == Target)
+      continue;
+
+    assert(TargetSetup->getParent()->getParent() == &MF &&
+           "branch setup must belong to the current machine function");
+    TargetOperand.setMBB(Target);
+    Changed = true;
+  }
+  return Changed;
+}
 
 static void printMachineCFG(const MachineFunction &MF) {
   errs() << "\nMachineFunction: " << MF.getName() << '\n';
@@ -184,10 +221,11 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
   MDT = &getAnalysis<MachineDominatorTreeWrapperPass>().getDomTree();
   MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
 
+  bool Changed = repairBranchTargets(MF);
+
   constexpr unsigned MaxBranchSetups = 32;
   if (BSI->Branches.size() > MaxBranchSetups) {
-    
-    return false;
+    return Changed;
   }
 
   // Collect work in machine-function order. Iteration order of the analysis
@@ -240,10 +278,10 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
   SmallPtrSet<MachineInstr *, 32> ClaimedSetups;
   for (const BranchWork &W : WorkList) {
     if (!W.S || !W.T)
-      return false;
+      return Changed;
     for (MachineInstr *SetupMI : {W.S, W.C, W.T})
       if (SetupMI && !ClaimedSetups.insert(SetupMI).second)
-        return false;
+        return Changed;
   }
 
   // Renumbering a callee-saved branch register would invalidate its
@@ -253,10 +291,9 @@ bool RISCVBranchSetupHoisting::runOnMachineFunction(MachineFunction &MF) {
     Register Reg = W.S->getOperand(0).getReg();
     for (const MCPhysReg *CSR = CalleeSavedRegs; *CSR; ++CSR)
       if (Reg == Register(*CSR))
-        return false;
+        return Changed;
   }
 
-  bool Changed = false;
   for (auto [BranchIdx, W] : llvm::enumerate(WorkList)) {
     Register NewReg = Register(RISCV::B0 + static_cast<unsigned>(BranchIdx));
     Register OldReg = W.S->getOperand(0).getReg();

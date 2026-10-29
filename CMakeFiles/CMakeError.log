@@ -1,0 +1,1076 @@
+Determining if the include file valgrind/valgrind.h exists failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_335e6 && [1/2] Building C object CMakeFiles/cmTC_335e6.dir/CheckIncludeFile.c.o
+FAILED: CMakeFiles/cmTC_335e6.dir/CheckIncludeFile.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_335e6.dir/CheckIncludeFile.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:10: fatal error: valgrind/valgrind.h: No such file or directory
+    1 | #include <valgrind/valgrind.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+
+Determining if the include file CrashReporterClient.h exists failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_08bcc && [1/2] Building C object CMakeFiles/cmTC_08bcc.dir/CheckIncludeFile.c.o
+FAILED: CMakeFiles/cmTC_08bcc.dir/CheckIncludeFile.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_08bcc.dir/CheckIncludeFile.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:10: fatal error: CrashReporterClient.h: No such file or directory
+    1 | #include <CrashReporterClient.h>
+      |          ^~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+
+Determining if the function pfm_initialize exists in the pfm failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_b4cd9 && [1/2] Building C object CMakeFiles/cmTC_b4cd9.dir/CheckFunctionExists.c.o
+[2/2] Linking C executable cmTC_b4cd9
+FAILED: cmTC_b4cd9 
+: && /usr/bin/cc -DCHECK_FUNCTION_EXISTS=pfm_initialize -O3 -DNDEBUG  CMakeFiles/cmTC_b4cd9.dir/CheckFunctionExists.c.o -o cmTC_b4cd9  -lpfm  -lm && :
+/usr/bin/ld: cannot find -lpfm: No such file or directory
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+
+Determining if the arc4random exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_1bb48 && [1/2] Building C object CMakeFiles/cmTC_1bb48.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_1bb48.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_1bb48.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c: In function ‘main’:
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:19: error: ‘arc4random’ undeclared (first use in this function); did you mean ‘srandom’?
+    8 |   return ((int*)(&arc4random))[argc];
+      |                   ^~~~~~~~~~
+      |                   srandom
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:19: note: each undeclared identifier is reported only once for each function it appears in
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stdlib.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef arc4random
+  return ((int*)(&arc4random))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test C_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_4f97f && [1/2] Building C object CMakeFiles/cmTC_4f97f.dir/src.c.o
+FAILED: CMakeFiles/cmTC_4f97f.dir/src.c.o 
+/usr/bin/cc -DC_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW  -O3 -DNDEBUG   -Werror=unguarded-availability-new -o CMakeFiles/cmTC_4f97f.dir/src.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c
+cc1: error: '-Werror=unguarded-availability-new': no option '-Wunguarded-availability-new'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main(void) { return 0; }
+Determining if the __unw_add_dynamic_fde exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_4730c && [1/2] Building C object CMakeFiles/cmTC_4730c.dir/CheckSymbolExists.c.o
+[2/2] Linking C executable cmTC_4730c
+FAILED: cmTC_4730c 
+: && /usr/bin/cc -O3 -DNDEBUG  CMakeFiles/cmTC_4730c.dir/CheckSymbolExists.c.o -o cmTC_4730c  -lm && :
+/usr/bin/ld: CMakeFiles/cmTC_4730c.dir/CheckSymbolExists.c.o: in function `main':
+CheckSymbolExists.c:(.text.startup+0x7): undefined reference to `__unw_add_dynamic_fde'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include </home/robert/scratch/llvm-non-spec/llvm/cmake/unwind.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef __unw_add_dynamic_fde
+  return ((int*)(&__unw_add_dynamic_fde))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the mallctl exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_79302 && [1/2] Building C object CMakeFiles/cmTC_79302.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_79302.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_79302.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:10: fatal error: malloc_np.h: No such file or directory
+    2 | #include <malloc_np.h>
+      |          ^~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <malloc_np.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef mallctl
+  return ((int*)(&mallctl))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the malloc_zone_statistics exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_eb3ed && [1/2] Building C object CMakeFiles/cmTC_eb3ed.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_eb3ed.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_eb3ed.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:10: fatal error: malloc/malloc.h: No such file or directory
+    2 | #include <malloc/malloc.h>
+      |          ^~~~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <malloc/malloc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef malloc_zone_statistics
+  return ((int*)(&malloc_zone_statistics))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strerror_s exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_0d213 && [1/2] Building C object CMakeFiles/cmTC_0d213.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_0d213.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_0d213.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c: In function ‘main’:
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:19: error: ‘strerror_s’ undeclared (first use in this function); did you mean ‘strerror_l’?
+    8 |   return ((int*)(&strerror_s))[argc];
+      |                   ^~~~~~~~~~
+      |                   strerror_l
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:8:19: note: each undeclared identifier is reported only once for each function it appears in
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <string.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strerror_s
+  return ((int*)(&strerror_s))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_118ec && [1/2] Building C object CMakeFiles/cmTC_118ec.dir/src.c.o
+FAILED: CMakeFiles/cmTC_118ec.dir/src.c.o 
+/usr/bin/cc -DHAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_118ec.dir/src.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c: In function ‘main’:
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c:7:34: error: ‘struct stat’ has no member named ‘st_mtimespec’
+    7 |   (void)sizeof(((struct stat *)0)->st_mtimespec.tv_nsec);
+      |                                  ^~
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+int main()
+{
+  (void)sizeof(((struct stat *)0)->st_mtimespec.tv_nsec);
+  return 0;
+}
+
+Determining if the pthread_get_name_np exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_e1e78 && [1/2] Building C object CMakeFiles/cmTC_e1e78.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_e1e78.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_e1e78.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:3:10: fatal error: pthread_np.h: No such file or directory
+    3 | #include <pthread_np.h>
+      |          ^~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+#include <pthread_np.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_get_name_np
+  return ((int*)(&pthread_get_name_np))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the pthread_set_name_np exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_456b7 && [1/2] Building C object CMakeFiles/cmTC_456b7.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_456b7.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_456b7.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:3:10: fatal error: pthread_np.h: No such file or directory
+    3 | #include <pthread_np.h>
+      |          ^~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+#include <pthread_np.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_set_name_np
+  return ((int*)(&pthread_set_name_np))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the proc_pid_rusage exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_94776 && [1/2] Building C object CMakeFiles/cmTC_94776.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_94776.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -O3 -DNDEBUG -o CMakeFiles/cmTC_94776.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:10: fatal error: libproc.h: No such file or directory
+    2 | #include <libproc.h>
+      |          ^~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <libproc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef proc_pid_rusage
+  return ((int*)(&proc_pid_rusage))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test C_SUPPORTS_CXX98_COMPAT_EXTRA_SEMI_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_18ca0 && [1/2] Building C object CMakeFiles/cmTC_18ca0.dir/src.c.o
+FAILED: CMakeFiles/cmTC_18ca0.dir/src.c.o 
+/usr/bin/cc -DC_SUPPORTS_CXX98_COMPAT_EXTRA_SEMI_FLAG  -fPIC -fno-semantic-interposition -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long  -O3 -DNDEBUG   -Werror -Wc++98-compat-extra-semi -o CMakeFiles/cmTC_18ca0.dir/src.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c
+cc: error: unrecognized command-line option '-Wc++98-compat-extra-semi'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C++ SOURCE FILE Test CXX_SUPPORTS_CXX98_COMPAT_EXTRA_SEMI_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_da059 && [1/2] Building CXX object CMakeFiles/cmTC_da059.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_da059.dir/src.cxx.o 
+/usr/bin/c++ -DCXX_SUPPORTS_CXX98_COMPAT_EXTRA_SEMI_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long  -O3 -DNDEBUG   -Werror -Wc++98-compat-extra-semi -std=c++17 -o CMakeFiles/cmTC_da059.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wc++98-compat-extra-semi'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C SOURCE FILE Test C_WCOMMENT_ALLOWS_LINE_WRAP failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_33c07 && [1/2] Building C object CMakeFiles/cmTC_33c07.dir/src.c.o
+FAILED: CMakeFiles/cmTC_33c07.dir/src.c.o 
+/usr/bin/cc -DC_WCOMMENT_ALLOWS_LINE_WRAP -D_GNU_SOURCE  -fPIC -fno-semantic-interposition -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough  -Werror -Wcomment -O3 -DNDEBUG -o CMakeFiles/cmTC_33c07.dir/src.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c:1:1: error: multi-line comment [-Werror=comment]
+    1 | // \
+      | ^
+cc1: all warnings being treated as errors
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+// \
+//
+int main(void) {return 0;}
+Performing C SOURCE FILE Test C_SUPPORTS_CTAD_MAYBE_UNSPPORTED_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_53944 && [1/2] Building C object CMakeFiles/cmTC_53944.dir/src.c.o
+FAILED: CMakeFiles/cmTC_53944.dir/src.c.o 
+/usr/bin/cc -DC_SUPPORTS_CTAD_MAYBE_UNSPPORTED_FLAG  -fPIC -fno-semantic-interposition -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-comment  -O3 -DNDEBUG   -Werror -Wctad-maybe-unsupported -o CMakeFiles/cmTC_53944.dir/src.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c
+cc1: error: command-line option '-Wctad-maybe-unsupported' is valid for C++/ObjC++ but not for C [-Werror]
+cc1: all warnings being treated as errors
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C++ SOURCE FILE Test LINKER_SUPPORTS_COLOR_DIAGNOSTICS failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_608e0 && [1/2] Building CXX object CMakeFiles/cmTC_608e0.dir/src.cxx.o
+[2/2] Linking CXX executable cmTC_608e0
+FAILED: cmTC_608e0 
+: && /usr/bin/c++ -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color  -O3 -DNDEBUG -Wl,--color-diagnostics CMakeFiles/cmTC_608e0.dir/src.cxx.o -o cmTC_608e0  -lm && :
+/usr/bin/ld: unrecognized option '--color-diagnostics'
+/usr/bin/ld: use the --help option for usage information
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Determining if the os_signpost_interval_begin exist failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_979f9 && [1/2] Building C object CMakeFiles/cmTC_979f9.dir/CheckSymbolExists.c.o
+FAILED: CMakeFiles/cmTC_979f9.dir/CheckSymbolExists.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -fPIC -fno-semantic-interposition -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-comment -fdiagnostics-color -ffunction-sections -fdata-sections  -O3 -DNDEBUG -o CMakeFiles/cmTC_979f9.dir/CheckSymbolExists.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:2:10: fatal error: os/signpost.h: No such file or directory
+    2 | #include <os/signpost.h>
+      |          ^~~~~~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+File /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <os/signpost.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef os_signpost_interval_begin
+  return ((int*)(&os_signpost_interval_begin))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C++ SOURCE FILE Test HAS_WERROR_GLOBAL_CTORS failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_dac56 && [1/2] Building CXX object CMakeFiles/cmTC_dac56.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_dac56.dir/src.cxx.o 
+/usr/bin/c++ -DHAS_WERROR_GLOBAL_CTORS  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -O3 -DNDEBUG   -Werror=global-constructors -std=c++17 -o CMakeFiles/cmTC_dac56.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+cc1plus: error: '-Werror=global-constructors': no option '-Wglobal-constructors'; did you mean '-felide-constructors'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Determining if the include file rpc/xdr.h exists failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_ec27a && [1/2] Building C object CMakeFiles/cmTC_ec27a.dir/CheckIncludeFile.c.o
+FAILED: CMakeFiles/cmTC_ec27a.dir/CheckIncludeFile.c.o 
+/usr/bin/cc -D_GNU_SOURCE  -fPIC -fno-semantic-interposition -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-comment -fdiagnostics-color -ffunction-sections -fdata-sections  -O3 -DNDEBUG -o CMakeFiles/cmTC_ec27a.dir/CheckIncludeFile.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+/home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/CheckIncludeFile.c:1:10: fatal error: rpc/xdr.h: No such file or directory
+    1 | #include <rpc/xdr.h>
+      |          ^~~~~~~~~~~
+compilation terminated.
+ninja: build stopped: subcommand failed.
+
+
+
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_NO_DEFAULT_CONFIG_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_01f47 && [1/2] Building CXX object CMakeFiles/cmTC_01f47.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_01f47.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_NO_DEFAULT_CONFIG_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  --no-default-config -O3 -DNDEBUG -std=c++17 -o CMakeFiles/cmTC_01f47.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '--no-default-config'; did you mean '--no-default-inline'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C SOURCE FILE Test CXX_SUPPORTS_UNWINDLIB_NONE_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_60469 && [1/2] Building C object CMakeFiles/cmTC_60469.dir/src.c.o
+FAILED: CMakeFiles/cmTC_60469.dir/src.c.o 
+/usr/bin/cc -DCXX_SUPPORTS_UNWINDLIB_NONE_FLAG  -fPIC -fno-semantic-interposition -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-comment -fdiagnostics-color -ffunction-sections -fdata-sections  --unwindlib=none -O3 -DNDEBUG -o CMakeFiles/cmTC_60469.dir/src.c.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.c
+cc: error: unrecognized command-line option '--unwindlib=none'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main(void) { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_FNO_SANITIZE_SAFE_STACK_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_8bf28 && [1/2] Building CXX object CMakeFiles/cmTC_8bf28.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_8bf28.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_FNO_SANITIZE_SAFE_STACK_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -fno-sanitize=safe-stack -std=c++17 -o CMakeFiles/cmTC_8bf28.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized argument to '-fno-sanitize=' option: 'safe-stack'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_FNO_PROFILE_INSTR_GENERATE_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_ba68a && [1/2] Building CXX object CMakeFiles/cmTC_ba68a.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_ba68a.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_FNO_PROFILE_INSTR_GENERATE_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -fno-profile-instr-generate -std=c++17 -o CMakeFiles/cmTC_ba68a.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-fno-profile-instr-generate'; did you mean '-fno-profile-generate'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_FNO_PROFILE_INSTR_USE_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_28790 && [1/2] Building CXX object CMakeFiles/cmTC_28790.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_28790.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_FNO_PROFILE_INSTR_USE_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -fno-profile-instr-use -std=c++17 -o CMakeFiles/cmTC_28790.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-fno-profile-instr-use'; did you mean '-fno-profile-use'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_FNO_COVERAGE_MAPPING_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_1a161 && [1/2] Building CXX object CMakeFiles/cmTC_1a161.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_1a161.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_FNO_COVERAGE_MAPPING_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -fno-coverage-mapping -std=c++17 -o CMakeFiles/cmTC_1a161.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-fno-coverage-mapping'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_MCRC_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_edf04 && [1/2] Building CXX object CMakeFiles/cmTC_edf04.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_edf04.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_MCRC_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -mcrc -std=c++17 -o CMakeFiles/cmTC_edf04.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-mcrc'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_TRIVIAL_AUTO_INIT failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_28c3f && [1/2] Building CXX object CMakeFiles/cmTC_28c3f.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_28c3f.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_TRIVIAL_AUTO_INIT  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -ftrivial-auto-var-init=pattern -std=c++17 -o CMakeFiles/cmTC_28c3f.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-ftrivial-auto-var-init=pattern'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_GR_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_70809 && [1/2] Building CXX object CMakeFiles/cmTC_70809.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_70809.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_GR_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /GR -std=c++17 -o CMakeFiles/cmTC_70809.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /GR: linker input file unused because linking not done
+c++: error: /GR: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_GS_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_efd7f && [1/2] Building CXX object CMakeFiles/cmTC_efd7f.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_efd7f.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_GS_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /GS -std=c++17 -o CMakeFiles/cmTC_efd7f.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /GS: linker input file unused because linking not done
+c++: error: /GS: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_MT_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_9c6d2 && [1/2] Building CXX object CMakeFiles/cmTC_9c6d2.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_9c6d2.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_MT_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /MT -std=c++17 -o CMakeFiles/cmTC_9c6d2.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /MT: linker input file unused because linking not done
+c++: error: /MT: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_Oy_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_7ae89 && [1/2] Building CXX object CMakeFiles/cmTC_7ae89.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_7ae89.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_Oy_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /Oy -std=c++17 -o CMakeFiles/cmTC_7ae89.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /Oy: linker input file unused because linking not done
+c++: error: /Oy: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_GLINE_TABLES_ONLY_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_28666 && [1/2] Building CXX object CMakeFiles/cmTC_28666.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_28666.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_GLINE_TABLES_ONLY_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -gline-tables-only -std=c++17 -o CMakeFiles/cmTC_28666.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized debug output level 'line-tables-only'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_Zi_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_93ad2 && [1/2] Building CXX object CMakeFiles/cmTC_93ad2.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_93ad2.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_Zi_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /Zi -std=c++17 -o CMakeFiles/cmTC_93ad2.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /Zi: linker input file unused because linking not done
+c++: error: /Zi: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WGLOBAL_CONSTRUCTORS_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_d57f3 && [1/2] Building CXX object CMakeFiles/cmTC_d57f3.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_d57f3.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WGLOBAL_CONSTRUCTORS_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wglobal-constructors -std=c++17 -o CMakeFiles/cmTC_d57f3.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wglobal-constructors'; did you mean '-felide-constructors'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WC99_EXTENSIONS_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_a4324 && [1/2] Building CXX object CMakeFiles/cmTC_a4324.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_a4324.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WC99_EXTENSIONS_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wc99-extensions -std=c++17 -o CMakeFiles/cmTC_a4324.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wc99-extensions'; did you mean '-fms-extensions'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WGNU_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_81264 && [1/2] Building CXX object CMakeFiles/cmTC_81264.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_81264.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WGNU_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wgnu -std=c++17 -o CMakeFiles/cmTC_81264.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wgnu'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WGNU_ANONYMOUS_STRUCT_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_c4149 && [1/2] Building CXX object CMakeFiles/cmTC_c4149.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_c4149.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WGNU_ANONYMOUS_STRUCT_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wgnu-anonymous-struct -std=c++17 -o CMakeFiles/cmTC_c4149.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wgnu-anonymous-struct'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WCOVERED_SWITCH_DEFAULT_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_e13ca && [1/2] Building CXX object CMakeFiles/cmTC_e13ca.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_e13ca.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WCOVERED_SWITCH_DEFAULT_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wcovered-switch-default -std=c++17 -o CMakeFiles/cmTC_e13ca.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wcovered-switch-default'; did you mean '-Wno-switch-default'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WTHREAD_SAFETY_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_eba0d && [1/2] Building CXX object CMakeFiles/cmTC_eba0d.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_eba0d.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WTHREAD_SAFETY_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wthread-safety -std=c++17 -o CMakeFiles/cmTC_eba0d.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wthread-safety'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WTHREAD_SAFETY_REFERENCE_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_ceaf1 && [1/2] Building CXX object CMakeFiles/cmTC_ceaf1.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_ceaf1.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WTHREAD_SAFETY_REFERENCE_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wthread-safety-reference -std=c++17 -o CMakeFiles/cmTC_ceaf1.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wthread-safety-reference'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WTHREAD_SAFETY_BETA_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_2cd68 && [1/2] Building CXX object CMakeFiles/cmTC_2cd68.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_2cd68.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WTHREAD_SAFETY_BETA_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wthread-safety-beta -std=c++17 -o CMakeFiles/cmTC_2cd68.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wthread-safety-beta'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_EXTERNAL_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_39703 && [1/2] Building CXX object CMakeFiles/cmTC_39703.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_39703.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_EXTERNAL_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /experimental:external /external:W0 -std=c++17 -o CMakeFiles/cmTC_39703.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /experimental:external: linker input file unused because linking not done
+c++: error: /experimental:external: linker input file not found: No such file or directory
+c++: warning: /external:W0: linker input file unused because linking not done
+c++: error: /external:W0: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_W4_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_6dceb && [1/2] Building CXX object CMakeFiles/cmTC_6dceb.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_6dceb.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_W4_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /W4 -std=c++17 -o CMakeFiles/cmTC_6dceb.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /W4: linker input file unused because linking not done
+c++: error: /W4: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WX_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_dc3c7 && [1/2] Building CXX object CMakeFiles/cmTC_dc3c7.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_dc3c7.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WX_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /WX -std=c++17 -o CMakeFiles/cmTC_dc3c7.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /WX: linker input file unused because linking not done
+c++: error: /WX: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WD4146_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_fa097 && [1/2] Building CXX object CMakeFiles/cmTC_fa097.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_fa097.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WD4146_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /wd4146 -std=c++17 -o CMakeFiles/cmTC_fa097.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /wd4146: linker input file unused because linking not done
+c++: error: /wd4146: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WD4206_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_6794e && [1/2] Building CXX object CMakeFiles/cmTC_6794e.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_6794e.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WD4206_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /wd4206 -std=c++17 -o CMakeFiles/cmTC_6794e.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /wd4206: linker input file unused because linking not done
+c++: error: /wd4206: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WD4291_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_a2f4c && [1/2] Building CXX object CMakeFiles/cmTC_a2f4c.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_a2f4c.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WD4291_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /wd4291 -std=c++17 -o CMakeFiles/cmTC_a2f4c.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /wd4291: linker input file unused because linking not done
+c++: error: /wd4291: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WD4221_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_924c5 && [1/2] Building CXX object CMakeFiles/cmTC_924c5.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_924c5.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WD4221_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /wd4221 -std=c++17 -o CMakeFiles/cmTC_924c5.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /wd4221: linker input file unused because linking not done
+c++: error: /wd4221: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WD4391_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_5b908 && [1/2] Building CXX object CMakeFiles/cmTC_5b908.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_5b908.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WD4391_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /wd4391 -std=c++17 -o CMakeFiles/cmTC_5b908.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /wd4391: linker input file unused because linking not done
+c++: error: /wd4391: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WD4722_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_a20ec && [1/2] Building CXX object CMakeFiles/cmTC_a20ec.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_a20ec.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WD4722_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /wd4722 -std=c++17 -o CMakeFiles/cmTC_a20ec.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /wd4722: linker input file unused because linking not done
+c++: error: /wd4722: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_WD4800_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_8403a && [1/2] Building CXX object CMakeFiles/cmTC_8403a.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_8403a.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_WD4800_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   /wd4800 -std=c++17 -o CMakeFiles/cmTC_8403a.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: warning: /wd4800: linker input file unused because linking not done
+c++: error: /wd4800: linker input file not found: No such file or directory
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_SUSPICIOUS_MEMACCESS_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_9546c && [1/2] Building CXX object CMakeFiles/cmTC_9546c.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_9546c.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_SUSPICIOUS_MEMACCESS_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wsuspicious-memaccess -std=c++17 -o CMakeFiles/cmTC_9546c.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wsuspicious-memaccess'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_BUILTIN_MEMCPY_CHK_SIZE_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_566eb && [1/2] Building CXX object CMakeFiles/cmTC_566eb.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_566eb.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_BUILTIN_MEMCPY_CHK_SIZE_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wbuiltin-memcpy-chk-size -std=c++17 -o CMakeFiles/cmTC_566eb.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wbuiltin-memcpy-chk-size'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_ARRAY_BOUNDS_POINTER_ARITHMETIC_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_f69e7 && [1/2] Building CXX object CMakeFiles/cmTC_f69e7.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_f69e7.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_ARRAY_BOUNDS_POINTER_ARITHMETIC_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Warray-bounds-pointer-arithmetic -std=c++17 -o CMakeFiles/cmTC_f69e7.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Warray-bounds-pointer-arithmetic'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_RETURN_STACK_ADDRESS_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_d9a73 && [1/2] Building CXX object CMakeFiles/cmTC_d9a73.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_d9a73.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_RETURN_STACK_ADDRESS_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wreturn-stack-address -std=c++17 -o CMakeFiles/cmTC_d9a73.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wreturn-stack-address'; did you mean '-Wreturn-local-addr'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_SIZEOF_ARRAY_DECAY_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_3e18b && [1/2] Building CXX object CMakeFiles/cmTC_3e18b.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_3e18b.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_SIZEOF_ARRAY_DECAY_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wsizeof-array-decay -std=c++17 -o CMakeFiles/cmTC_3e18b.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wsizeof-array-decay'; did you mean '-Wsizeof-array-div'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_FORMAT_INSUFFICIENT_ARGS_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_a6f16 && [1/2] Building CXX object CMakeFiles/cmTC_a6f16.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_a6f16.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_FORMAT_INSUFFICIENT_ARGS_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -Werror -Wformat-insufficient-args -std=c++17 -o CMakeFiles/cmTC_a6f16.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wformat-insufficient-args'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test COMPILER_RT_HAS_NOSTDLIBXX_FLAG failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_19cf1 && [1/2] Building CXX object CMakeFiles/cmTC_19cf1.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_19cf1.dir/src.cxx.o 
+/usr/bin/c++ -DCOMPILER_RT_HAS_NOSTDLIBXX_FLAG  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -nodefaultlibs -O3 -DNDEBUG   -nostdlib++ -std=c++17 -o CMakeFiles/cmTC_19cf1.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-nostdlib++'; did you mean '-nostdlib'?
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Determining if the function backtrace exists in the execinfo failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_812b0 && [1/2] Building C object CMakeFiles/cmTC_812b0.dir/CheckFunctionExists.c.o
+[2/2] Linking C executable cmTC_812b0
+FAILED: cmTC_812b0 
+: && /usr/bin/cc -fPIC -fno-semantic-interposition -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-comment -fdiagnostics-color -ffunction-sections -fdata-sections -DCHECK_FUNCTION_EXISTS=backtrace  -nodefaultlibs -O3 -DNDEBUG  CMakeFiles/cmTC_812b0.dir/CheckFunctionExists.c.o -o cmTC_812b0  -lexecinfo  -lm  -lc  -lgcc_s  -lunwind && :
+/usr/bin/ld: cannot find -lexecinfo: No such file or directory
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+
+Determining if the function __cxa_throw exists in the c++ failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_e0528 && [1/2] Building C object CMakeFiles/cmTC_e0528.dir/CheckFunctionExists.c.o
+[2/2] Linking C executable cmTC_e0528
+FAILED: cmTC_e0528 
+: && /usr/bin/cc -fPIC -fno-semantic-interposition -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-comment -fdiagnostics-color -ffunction-sections -fdata-sections -DCHECK_FUNCTION_EXISTS=__cxa_throw  -nodefaultlibs -O3 -DNDEBUG  CMakeFiles/cmTC_e0528.dir/CheckFunctionExists.c.o -o cmTC_e0528  -lc++  -lm  -lc  -lgcc_s  -lunwind && :
+/usr/bin/ld: cannot find -lc++: No such file or directory
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+
+Testing compiler for supporting FLAGS-fxray-instrument -nodefaultlibs:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;-fxray-instrument;;-nodefaultlibs;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[Kcc:[m[K [01;31m[Kerror: [m[Kunrecognized command-line option ‘[01m[K-fxray-instrument[m[K’
+
+1
+Testing compiler for supporting FLAGS-nogpulib -nodefaultlibs:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;-nogpulib;;-nodefaultlibs;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[Kcc:[m[K [01;31m[Kerror: [m[Kunrecognized command-line option ‘[01m[K-nogpulib[m[K’
+
+1
+Testing compiler for supporting FLAGS-fconvergent-functions -nodefaultlibs:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;-fconvergent-functions;;-nodefaultlibs;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[Kcc:[m[K [01;31m[Kerror: [m[Kunrecognized command-line option ‘[01m[K-fconvergent-functions[m[K’; did you mean ‘[01m[K-finstrument-functions[m[K’?
+
+1
+Testing compiler for supporting FLAGS-Xclang -mcode-object-version=none -nodefaultlibs:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;-Xclang;-mcode-object-version=none;;-nodefaultlibs;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[Kcc:[m[K [01;31m[Kerror: [m[Kunrecognized command-line option ‘[01m[K-Xclang[m[K’
+[01m[Kcc:[m[K [01;31m[Kerror: [m[Kunrecognized command-line option ‘[01m[K-mcode-object-version=none[m[K’
+
+1
+Testing compiler for supporting FLAGS/Zl -nodefaultlibs:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;/Zl;;-nodefaultlibs;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[Kcc:[m[K [01;35m[Kwarning: [m[K/Zl: linker input file unused because linking not done
+[01m[Kcc:[m[K [01;31m[Kerror: [m[K/Zl: linker input file not found: No such file or directory
+
+1
+Testing compiler for supporting SOURCE
+asm(".arch armv8-a+lse")
+asm("cas w0, w1, [x2]")
+:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+/tmp/cc85VaI4.s: Assembler messages:
+/tmp/cc85VaI4.s:4: Error: no such architecture: `armv8'
+/tmp/cc85VaI4.s:4: Error: junk at end of line, first unrecognized character is `-'
+/tmp/cc85VaI4.s:5: Error: no such instruction: `cas w0,w1,[x2]'
+
+1
+Testing compiler for supporting SOURCE
+void foo(void)  __arm_streaming_compatible {
+  asm(".arch armv9-a+sme2\n"
+      "smstart\n"
+      "ldr zt0, [sp]")
+}
+:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[K/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c:[m[K In function ‘[01m[Kfoo[m[K’:
+[01m[K/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c:2:17:[m[K [01;31m[Kerror: [m[Kexpected declaration specifiers before ‘[01m[K__arm_streaming_compatible[m[K’
+    2 | void foo(void)  [01;31m[K__arm_streaming_compatible[m[K {
+      |                 [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[01m[K/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c:8:[m[K [01;31m[Kerror: [m[Kexpected ‘[01m[K{[m[K’ at end of input
+
+1
+Testing compiler for supporting SOURCE
+void foo() {
+#ifndef __ARM_FEATURE_UNALIGNED
+#error "Unaligned accesses unsupported"
+#endif
+}
+:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[K/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c:[m[K In function ‘[01m[Kfoo[m[K’:
+[01m[K/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c:4:2:[m[K [01;31m[Kerror: [m[K#error "Unaligned accesses unsupported"
+    4 | #[01;31m[Kerror[m[K "Unaligned accesses unsupported"
+      |  [01;31m[K^~~~~[m[K
+
+1
+Testing compiler for supporting SOURCE
+void foo() {
+#ifndef __ARM_FP
+#error "No floating-point support"
+#endif
+}
+:
+Command: /usr/bin/cc;;;;-fPIC;-fno-semantic-interposition;-Werror=date-time;-Wall;-Wextra;-Wno-unused-parameter;-Wwrite-strings;-Wcast-qual;-Wno-missing-field-initializers;-pedantic;-Wno-long-long;-Wimplicit-fallthrough;-Wno-comment;-fdiagnostics-color;-ffunction-sections;-fdata-sections;-Wall;-Wno-unused-parameter;;-o;/home/robert/scratch/llvm-non-spec/CMakeFiles/test.o;-c;/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c
+
+[01m[K/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c:[m[K In function ‘[01m[Kfoo[m[K’:
+[01m[K/home/robert/scratch/llvm-non-spec/CMakeFiles/src.c:4:2:[m[K [01;31m[Kerror: [m[K#error "No floating-point support"
+    4 | #[01;31m[Kerror[m[K "No floating-point support"
+      |  [01;31m[K^~~~~[m[K
+
+1
+Performing C++ SOURCE FILE Test HAVE_LINKER_FLAG_LONG_PLT failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_04d48 && [1/2] Building CXX object CMakeFiles/cmTC_04d48.dir/src.cxx.o
+[2/2] Linking CXX executable cmTC_04d48
+FAILED: cmTC_04d48 
+: && /usr/bin/c++ -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections -fno-common -Woverloaded-virtual  -O3 -DNDEBUG -Wl,--long-plt CMakeFiles/cmTC_04d48.dir/src.cxx.o -o cmTC_04d48  -lm && :
+/usr/bin/ld: unrecognized option '--long-plt'
+/usr/bin/ld: use the --help option for usage information
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WSHORTEN_64_TO_32 failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_90e6f && [1/2] Building CXX object CMakeFiles/cmTC_90e6f.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_90e6f.dir/src.cxx.o 
+/usr/bin/c++ -DHAVE_CXX_FLAG_WSHORTEN_64_TO_32  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -Wold-style-cast  -Wsuggest-override  -pedantic  -pedantic-errors  -Wshorten-64-to-32 -O3 -DNDEBUG   -Wshorten-64-to-32 -std=c++11 -o CMakeFiles/cmTC_90e6f.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wshorten-64-to-32'
+c++: error: unrecognized command-line option '-Wshorten-64-to-32'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WD654 failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_3b568 && [1/2] Building CXX object CMakeFiles/cmTC_3b568.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_3b568.dir/src.cxx.o 
+/usr/bin/c++ -DHAVE_CXX_FLAG_WD654  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -Wold-style-cast  -Wsuggest-override  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -fno-exceptions  -Wstrict-aliasing  -wd654 -O3 -DNDEBUG   -wd654 -std=c++11 -o CMakeFiles/cmTC_3b568.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-wd654'
+c++: error: unrecognized command-line option '-wd654'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test HAVE_CXX_FLAG_WTHREAD_SAFETY failed with the following output:
+Change Dir: /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/ninja cmTC_9a44f && [1/2] Building CXX object CMakeFiles/cmTC_9a44f.dir/src.cxx.o
+FAILED: CMakeFiles/cmTC_9a44f.dir/src.cxx.o 
+/usr/bin/c++ -DHAVE_CXX_FLAG_WTHREAD_SAFETY  -fPIC -fno-semantic-interposition -fvisibility-inlines-hidden -Werror=date-time -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wno-missing-field-initializers -pedantic -Wno-long-long -Wimplicit-fallthrough -Wno-uninitialized -Wno-nonnull -Wno-class-memaccess -Wno-redundant-move -Wno-pessimizing-move -Wno-noexcept-type -Wdelete-non-virtual-dtor -Wsuggest-override -Wno-comment -Wno-misleading-indentation -Wctad-maybe-unsupported -fdiagnostics-color -ffunction-sections -fdata-sections  -Wall  -Wextra  -Wshadow  -Wfloat-equal  -Wold-style-cast  -Wsuggest-override  -pedantic  -pedantic-errors  -fstrict-aliasing  -Wno-deprecated-declarations  -fno-exceptions  -Wstrict-aliasing  -Wthread-safety -O3 -DNDEBUG   -Wthread-safety -std=c++11 -o CMakeFiles/cmTC_9a44f.dir/src.cxx.o -c /home/robert/scratch/llvm-non-spec/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option '-Wthread-safety'
+c++: error: unrecognized command-line option '-Wthread-safety'
+ninja: build stopped: subcommand failed.
+
+
+Source file was:
+int main() { return 0; }

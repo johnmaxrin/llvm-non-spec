@@ -27,14 +27,9 @@ using namespace llvm;
 
 #define RISCV_EXPAND_PSEUDO_NAME "RISC-V pseudo instruction expansion pass"
 #define RISCV_PRERA_EXPAND_PSEUDO_NAME "RISC-V Pre-RA pseudo instruction expansion pass"
-#define RISCV_EXPAND_LOOP_PSEUDO_NAME "RISC-V hardware loop expansion pass"
 
 namespace {
 
-static bool expandLoopEnd(MachineBasicBlock &MBB,
-                          MachineBasicBlock::iterator MBBI,
-                          const RISCVInstrInfo *TII,
-                          const MachineLoopInfo *MLI);
 
 class RISCVExpandPseudo : public MachineFunctionPass {
 public:
@@ -48,14 +43,14 @@ public:
 
   bool runOnMachineFunction(MachineFunction &MF) override;
 
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    MachineFunctionPass::getAnalysisUsage(AU);
-    AU.addRequired<MachineLoopInfoWrapperPass>();
-    AU.addRequired<MachineDominatorTreeWrapperPass>();
-    AU.setPreservesAll();
-  }
+  // void getAnalysisUsage(AnalysisUsage &AU) const override {
+  //   MachineFunctionPass::getAnalysisUsage(AU);
+  //   AU.addRequired<MachineLoopInfoWrapperPass>();
+  //   AU.addRequired<MachineDominatorTreeWrapperPass>();
+  //   AU.setPreservesAll();
+  // }
 
-  StringRef getPassName() const override { return RISCV_EXPAND_PSEUDO_NAME; }
+  //StringRef getPassName() const override { return RISCV_EXPAND_PSEUDO_NAME; }
 
   MachineFunctionProperties getClearedProperties() const override {
     return MachineFunctionProperties().setNoVRegs();
@@ -95,6 +90,7 @@ private:
                            MachineBasicBlock::iterator MBBI);
   bool expandPseudoReadVLENBViaVSETVLIX0(MachineBasicBlock &MBB,
                                          MachineBasicBlock::iterator MBBI);
+  
 #ifndef NDEBUG
   unsigned getInstSizeInBytes(const MachineFunction &MF) const {
     unsigned Size = 0;
@@ -119,29 +115,29 @@ private:
   DenseMap<const MachineInstr *, MachineInstr *> LoopSetups;
 };
 
-class RISCVExpandLoopPseudo : public MachineFunctionPass {
-public:
-  const RISCVInstrInfo *TII;
-  const MachineLoopInfo *MLI;
-  static char ID;
+// class RISCVExpandLoopPseudo : public MachineFunctionPass {
+// public:
+//   const RISCVInstrInfo *TII;
+//   const MachineLoopInfo *MLI;
+//   static char ID;
 
-  RISCVExpandLoopPseudo() : MachineFunctionPass(ID) {}
+//   RISCVExpandLoopPseudo() : MachineFunctionPass(ID) {}
 
-  bool runOnMachineFunction(MachineFunction &MF) override;
+//   bool runOnMachineFunction(MachineFunction &MF) override;
 
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    MachineFunctionPass::getAnalysisUsage(AU);
-    AU.addRequired<MachineLoopInfoWrapperPass>();
-    AU.setPreservesCFG();
-  }
+//   void getAnalysisUsage(AnalysisUsage &AU) const override {
+//     MachineFunctionPass::getAnalysisUsage(AU);
+//     AU.addRequired<MachineLoopInfoWrapperPass>();
+//     AU.setPreservesCFG();
+//   }
 
-  StringRef getPassName() const override {
-    return RISCV_EXPAND_LOOP_PSEUDO_NAME;
-  }
-};
+//   // StringRef getPassName() const override {
+//   //   return RISCV_EXPAND_LOOP_PSEUDO_NAME;
+//   // }
+// };
 
 char RISCVExpandPseudo::ID = 0;
-char RISCVExpandLoopPseudo::ID = 0;
+// char RISCVExpandLoopPseudo::ID = 0;
 
 bool RISCVExpandPseudo::runOnMachineFunction(MachineFunction &MF) {
   STI = &MF.getSubtarget<RISCVSubtarget>();
@@ -855,22 +851,22 @@ bool RISCVExpandPseudo::expandLoopEnd(MachineBasicBlock &MBB,
   return true;
 }
 
-bool RISCVExpandLoopPseudo::runOnMachineFunction(MachineFunction &MF) {
-  TII = MF.getSubtarget<RISCVSubtarget>().getInstrInfo();
-  MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
+// bool RISCVExpandLoopPseudo::runOnMachineFunction(MachineFunction &MF) {
+//   TII = MF.getSubtarget<RISCVSubtarget>().getInstrInfo();
+//   MLI = &getAnalysis<MachineLoopInfoWrapperPass>().getLI();
 
-  bool Modified = false;
-  for (MachineBasicBlock &MBB : MF) {
-    for (MachineBasicBlock::iterator MBBI = MBB.begin(), E = MBB.end();
-         MBBI != E;) {
-      MachineBasicBlock::iterator Next = std::next(MBBI);
-      if (MBBI->getOpcode() == RISCV::PseudoLoopEnd)
-        Modified |= expandLoopEnd(MBB, MBBI, TII, MLI);
-      MBBI = Next;
-    }
-  }
-  return Modified;
-}
+//   bool Modified = false;
+//   for (MachineBasicBlock &MBB : MF) {
+//     for (MachineBasicBlock::iterator MBBI = MBB.begin(), E = MBB.end();
+//          MBBI != E;) {
+//       MachineBasicBlock::iterator Next = std::next(MBBI);
+//       if (MBBI->getOpcode() == RISCV::PseudoLoopEnd)
+//         Modified |= expandLoopEnd(MBB, MBBI);
+//       MBBI = Next;
+//     }
+//   }
+//   return Modified;
+// }
 
 bool RISCVExpandPseudo::expandMV_FPR32INX(MachineBasicBlock &MBB,
                                           MachineBasicBlock::iterator MBBI) {
@@ -1235,8 +1231,8 @@ bool RISCVPreRAExpandPseudo::expandLoadTLSDescAddress(
 INITIALIZE_PASS(RISCVExpandPseudo, "riscv-expand-pseudo",
                 RISCV_EXPAND_PSEUDO_NAME, false, false)
 
-INITIALIZE_PASS(RISCVExpandLoopPseudo, "riscv-expand-loop-pseudo",
-                RISCV_EXPAND_LOOP_PSEUDO_NAME, false, false)
+// INITIALIZE_PASS(RISCVExpandLoopPseudo, "riscv-expand-loop-pseudo",
+//                 RISCV_EXPAND_LOOP_PSEUDO_NAME, false, false)
 
 INITIALIZE_PASS(RISCVPreRAExpandPseudo, "riscv-prera-expand-pseudo",
                 RISCV_PRERA_EXPAND_PSEUDO_NAME, false, false)
@@ -1244,9 +1240,9 @@ INITIALIZE_PASS(RISCVPreRAExpandPseudo, "riscv-prera-expand-pseudo",
 namespace llvm {
 
 FunctionPass *createRISCVExpandPseudoPass() { return new RISCVExpandPseudo(); }
-FunctionPass *createRISCVExpandLoopPseudoPass() {
-  return new RISCVExpandLoopPseudo();
-}
+// FunctionPass *createRISCVExpandLoopPseudoPass() {
+  // return new RISCVExpandLoopPseudo();
+// }
 FunctionPass *createRISCVPreRAExpandPseudoPass() { return new RISCVPreRAExpandPseudo(); }
 
 } // end of namespace llvm
