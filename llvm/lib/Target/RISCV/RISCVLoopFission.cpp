@@ -88,7 +88,6 @@ public:
     AU.addRequired<MachineDominatorTreeWrapperPass>();
     AU.addRequired<MachineLoopInfoWrapperPass>();
     AU.addRequired<AAResultsWrapperPass>();
-    AU.setPreservesCFG();
     MachineFunctionPass::getAnalysisUsage(AU);
   }
 
@@ -117,6 +116,25 @@ private:
 };
 
 char RISCVLoopFissionDecomposedBranch::ID = 0;
+
+static bool isIRFissioned(const MachineLoop &L) {
+  const MachineBasicBlock *Latch = L.getLoopLatch();
+  const BasicBlock *IRLatch = Latch ? Latch->getBasicBlock() : nullptr;
+  const Instruction *Term = IRLatch ? IRLatch->getTerminator() : nullptr;
+  const MDNode *LoopID = Term ? Term->getMetadata(LLVMContext::MD_loop)
+                              : nullptr;
+  if (!LoopID)
+    return false;
+  for (unsigned I = 1; I < LoopID->getNumOperands(); ++I) {
+    auto *Option = dyn_cast<MDNode>(LoopID->getOperand(I));
+    if (!Option || Option->getNumOperands() != 1)
+      continue;
+    auto *Name = dyn_cast<MDString>(Option->getOperand(0));
+    if (Name && Name->getString() == "riscv.loop-fissioned")
+      return true;
+  }
+  return false;
+}
 
 bool RISCVLoopFissionDecomposedBranch::isFissionCandidate(
     MachineLoop &L) const {
@@ -621,7 +639,7 @@ bool RISCVLoopFissionDecomposedBranch::runOnMachineFunction(
   // Snapshot headers first. fissionLoop rebuilds MLI, which frees MachineLoops.
   SmallVector<MachineBasicBlock *, 4> Headers;
   for (MachineLoop *L : MLI->getLoopsInPreorder())
-    if (L->isInnermost())
+    if (L->isInnermost() && !isIRFissioned(*L))
       Headers.push_back(L->getHeader());
 
   bool Changed = false;

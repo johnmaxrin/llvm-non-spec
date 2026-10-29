@@ -77,6 +77,7 @@
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicsRISCV.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/InitializePasses.h"
@@ -1040,6 +1041,15 @@ bool RISCVBranchConditionPipelining::runOnFunction(Function &F) {
   // as it was.
   unsigned Branches = estimateBranchRegisters(F);
   unsigned NextQueue = 0;
+  for (Instruction &I : instructions(F))
+    if (auto *II = dyn_cast<IntrinsicInst>(&I))
+      if (II->getIntrinsicID() == Intrinsic::riscv_ns_cond_init ||
+          II->getIntrinsicID() == Intrinsic::riscv_ns_cond_push) {
+        auto *Queue = dyn_cast<ConstantInt>(II->getArgOperand(0));
+        if (Queue)
+          NextQueue = std::max(
+              NextQueue, static_cast<unsigned>(Queue->getZExtValue() + 1));
+      }
   SmallVector<LoopPlan, 4> Plans;
   for (Loop *L : LI->getLoopsInPreorder()) {
     std::optional<LoopPlan> P = analyzeLoop(L);

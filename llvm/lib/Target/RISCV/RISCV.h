@@ -126,6 +126,9 @@ void initializeRISCVBranchSetupHoistingPass(PassRegistry &);
 FunctionPass *createRISCVBranchConditionPipeliningPass();
 void initializeRISCVBranchConditionPipeliningPass(PassRegistry &);
 
+FunctionPass *createRISCVIRLoopFissionPass();
+void initializeRISCVIRLoopFissionPass(PassRegistry &);
+
 FunctionPass *createRISCVBranchSetupAnalysisPass();
 void initializeRISCVBranchSetupAnalysisWrapperPass(PassRegistry &);
 
