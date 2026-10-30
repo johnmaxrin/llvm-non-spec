@@ -808,9 +808,7 @@ bool RISCVExpandPseudo::expandLoopEnd(MachineBasicBlock &MBB,
   assert(Setup && "Loop end must also contain a setup");
 
   MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
-  Register BStart = MRI.createVirtualRegister(&RISCV::PBRRegClass);
-  Register BTarget = MRI.createVirtualRegister(&RISCV::PBRRegClass);
-  Register BLoop = MRI.createVirtualRegister(&RISCV::PBRRegClass);
+  Register BReg = MRI.createVirtualRegister(&RISCV::PBRRegClass);
   DebugLoc DL = MBBI->getDebugLoc();
   MCContext &Context = MBB.getParent()->getContext();
   MCSymbol *Sym = Context.createTempSymbol("ns_loop_");
@@ -821,27 +819,27 @@ bool RISCVExpandPseudo::expandLoopEnd(MachineBasicBlock &MBB,
   // Emit BMOVS B0, ns_loop_
   BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(),
           TII->get(RISCV::BMOVS_J))
-      .addDef(BStart)
+      .addDef(BReg)
       .addSym(Sym);
 
   // Emit BMOVT B0, Target
   BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(),
           TII->get(RISCV::BMOVT_J))
-      .addDef(BTarget)
-      .addReg(BStart)
+      .addDef(BReg)
+      .addReg(BReg)
       .addMBB(TargetMBB);
 
   // Emit BMOVC_LOOP B0, Rs1, 0
   BuildMI(*Setup->getParent(), Setup, Setup->getDebugLoc(),
           TII->get(RISCV::BMOVC_LOOP))
-      .addDef(BLoop)
-      .addReg(BTarget)
+      .addDef(BReg)
+      .addReg(BReg)
       .addReg(Count)
       .addImm(-1);
 
   // Emit conditional branch
   BuildMI(MBB, MBBI, DL, TII->get(RISCV::PseudoPBC))
-      .addReg(BLoop)
+      .addReg(BReg)
       .addMBB(TargetMBB);
 
   Setup->eraseFromParent();
